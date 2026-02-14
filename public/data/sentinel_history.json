@@ -1,0 +1,1017 @@
+[
+  {
+    "token": {
+      "address": "DcnZzHmbNy6DjPYfKiribzfoRbbZtBRVcFUoCtEash9b",
+      "chainId": "ton",
+      "name": "Unknown",
+      "symbol": "???",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/22853e7bc0a6ad3504f55e394e9b5bb03cb4b6984bebf18a8c2d32d19f6a0f8b?width=64&height=64&fit=crop&quality=95&format=auto",
+      "website": "https://bonk.fun/token/DcnZzHmbNy6DjPYfKiribzfoRbbZtBRVcFUoCtEash9b",
+      "twitter": "https://x.com/doIIares/status/2007174542305935427?s=20"
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing website screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Analyzing website visuals for red flags...",
+        "timestamp": 3100,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 3900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 4900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 5600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:14:14.020Z"
+  },
+  {
+    "token": {
+      "address": "HDKi2Y6nihrYKdQXt63DzT6jMLtgL9vQREGXxLJcpump",
+      "chainId": "ton",
+      "name": "Unknown",
+      "symbol": "???",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/da1e4a4ea47db78dac1642bc0058132366aaa85ebb672702a95c43cc000157e5?width=64&height=64&fit=crop&quality=95&format=auto",
+      "twitter": "https://x.com/i/communities/2007176103446597729"
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 2900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 3600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:14:31.999Z"
+  },
+  {
+    "token": {
+      "address": "fgQkxC7HbmZD7LS5YPKFww5xQJWoVo7GYddRGtxpump",
+      "chainId": "ton",
+      "name": "Allocore",
+      "symbol": "???",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/85efa11f8ba68ceded14b142ad654b6c35f083454a7e5939bfb61d576cca932b?width=64&height=64&fit=crop&quality=95&format=auto",
+      "website": "https://allocore.xyz",
+      "twitter": "https://x.com/Allocorexyz",
+      "description": "Allocore Protocol is a programmable allocation and incentive layer for tokenized communities on TON."
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing website screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Analyzing website visuals for red flags...",
+        "timestamp": 3100,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 3900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 4900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 5600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:14:57.874Z"
+  },
+  {
+    "token": {
+      "address": "21wKtupjdutCL7nAQBrkQsiq898gdEzxUobrRetnpump",
+      "chainId": "ton",
+      "name": "In",
+      "symbol": "TVRKE",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/b689f89d27f7431a28687f4d5f122b72f24c80b08e0b48fbd4a5cc303747e8f6?width=64&height=64&fit=crop&quality=95&format=auto",
+      "twitter": "https://x.com/i/communities/2007151865578856748",
+      "description": "In every cycle, there’s noise—then there’s Trvth.\n\nInfluencers lie. Narratives crack. Reality drops like a bomb.\n\n$TVRKE represents Trvth over comfort.\nNo sugarcoating. No fake promises.\nWhen information hits harder than spin and memes move markets before fundamentals."
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 2900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 3600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:15:13.859Z"
+  },
+  {
+    "token": {
+      "address": "ZgAe7p4Y6zRwxWn8jS66MMN7maJqgvRSu8XxgrJpump",
+      "chainId": "ton",
+      "name": "Unknown",
+      "symbol": "???",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/989b7011c77eaadaaba1588d25bcfe0c0a70c6b878c5b4f22463ee8637cfdb3f?width=64&height=64&fit=crop&quality=95&format=auto",
+      "website": "https://pump.fun/coin/ZgAe7p4Y6zRwxWn8jS66MMN7maJqgvRSu8XxgrJpump",
+      "twitter": "https://x.com/i/communities/2007170783660122268"
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing website screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Analyzing website visuals for red flags...",
+        "timestamp": 3100,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 3900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 4900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 5600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:15:52.036Z"
+  },
+  {
+    "token": {
+      "address": "8BLngtAzzn1mZ8dBiFTPnPfEFeyRyfjfizE7xGeRpump",
+      "chainId": "ton",
+      "name": "Just",
+      "symbol": "???",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/ac616553fa2bef7a3a92e86ce89ef24ee852efbb50868f2be1be1f2f003f1bde?width=64&height=64&fit=crop&quality=95&format=auto",
+      "twitter": "https://x.com/i/communities/2007140001264320676",
+      "description": "Just a guy who likes horses"
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 2900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 3600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:16:06.005Z"
+  },
+  {
+    "token": {
+      "address": "BTPcQVTsn4mEmajpiXAr4cdshW5duCS6sAfcQCi3bonk",
+      "chainId": "ton",
+      "name": "Bobo",
+      "symbol": "???",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/bb1de37fbc38cddb2de737507cda6278c20df1ed1bd096fac684cc8c250d46fc?width=64&height=64&fit=crop&quality=95&format=auto",
+      "twitter": "https://x.com/BoboUSD1",
+      "description": "Bobo ON USD1\n\nFirst BEAR TOKEN"
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 2900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 3600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:16:21.051Z"
+  },
+  {
+    "token": {
+      "address": "C7UVVok1K9xpTFrsPn4o8jqveoCNo7CTwdG3ToHUbonk",
+      "chainId": "ton",
+      "name": "dog",
+      "symbol": "???",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/6afca90b161aab6416f11d76d8ebb696995e0787be54efd94d2c956e3253a71c?width=64&height=64&fit=crop&quality=95&format=auto",
+      "website": "https://www.instagram.com/p/CG-UaTbgQgp/",
+      "twitter": "https://x.com/i/communities/2007154837905883421",
+      "description": "dog wif mullet"
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing website screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Analyzing website visuals for red flags...",
+        "timestamp": 3100,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 3900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 4900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 5600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:17:05.642Z"
+  },
+  {
+    "token": {
+      "address": "962SGZ4A1yDDAqyoVTVmRb64ViKunUuqHqbop4VWpump",
+      "chainId": "ton",
+      "name": "ElizaOS-powered",
+      "symbol": "???",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/1b3c3d4acc41e551d9a0eca8ce38e93305fb1e9da6cf0efd6f335053bbca89e3?width=64&height=64&fit=crop&quality=95&format=auto",
+      "website": "https://www.cleothe.codes/",
+      "twitter": "https://x.com/ai16zCleoOs",
+      "description": "ElizaOS-powered security auditor || Code, contracts, APIs || Zero-retention encryption || Vulnerabilities caught before exploitation"
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing website screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Analyzing website visuals for red flags...",
+        "timestamp": 3100,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 3900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 4900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 5600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:17:31.228Z"
+  },
+  {
+    "token": {
+      "address": "EE2B4chrBddpDkfQeN91shzoxU1gRE8XWzH3hatgeJxT",
+      "chainId": "ton",
+      "name": "Unknown",
+      "symbol": "???",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/e597bc8ac335692b1c6c0df18fdc8b835a5db7d6d89c08a6e9044238902fe895?width=64&height=64&fit=crop&quality=95&format=auto",
+      "twitter": "https://x.com/i/communities/2007169623612109095",
+      "description": ""
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 2900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 3600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:17:45.909Z"
+  },
+  {
+    "token": {
+      "address": "4w3qc7C5p6NRZKkeTz1nXQzic91sW1A43rHqBnGCpump",
+      "chainId": "ton",
+      "name": "Entei",
+      "symbol": "???",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/68ec027b61bacb14a57a998ede7fef8730a0f6f0023d284da2d0e60ff8fe8125?width=64&height=64&fit=crop&quality=95&format=auto",
+      "twitter": "https://x.com/i/communities/2006978886366532004",
+      "description": "Entei is a legendary fire-type beast first spottted in Pokemon Gold, Silver, and Crystal. Fire = Burns 🔥 All creator fees go to boost and burns 🔥"
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 2900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 3600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:17:59.745Z"
+  },
+  {
+    "token": {
+      "address": "H4SjSNaTuTQH57Bj6ZuhsRfV8vCTTySRKt8DY8GPpump",
+      "chainId": "ton",
+      "name": "PUMP",
+      "symbol": "???",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/9f45495bd91efd3157ed02001bbffb7a8e9f6c3863a8e14fffdea768a021680d?width=64&height=64&fit=crop&quality=95&format=auto",
+      "twitter": "https://x.com/i/communities/2007158693104656676",
+      "description": "PUMP szn"
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 2900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 3600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:18:11.617Z"
+  },
+  {
+    "token": {
+      "address": "GufpyNT1dFdM45fXmdW25RR5DQXyVXFGS8v6syMbWFeE",
+      "chainId": "ton",
+      "name": "Lock",
+      "symbol": "SHIP",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/72e11fc1bee19a17fdb6b1fc666f95a17271cc7cb8d6266856bd11009cca6bf8?width=64&height=64&fit=crop&quality=95&format=auto",
+      "website": "https://www.committoship.xyz",
+      "twitter": "https://x.com/CommitToShip",
+      "description": "Lock your pumpfun creator fees in on-chain escrow. Set milestones; holders vote to approve releases. Miss a deadline? Fees get redistributed to voters and fuel $SHIP buybacks."
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing website screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Analyzing website visuals for red flags...",
+        "timestamp": 3100,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 3900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 4900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 5600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:18:35.083Z"
+  },
+  {
+    "token": {
+      "address": "3Qb3M15b645MyBRETQdA4knGmxqzXdLgK5w4AkxwAdmj",
+      "chainId": "ton",
+      "name": "The",
+      "symbol": "???",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/35958ec730fa481dea2916878ced373dacc939022c5817530b29175bb8282444?width=64&height=64&fit=crop&quality=95&format=auto",
+      "twitter": "https://x.com/i/communities/2007165457338417623",
+      "description": "The MAGA Prince on USD1. Official DTJR deployer wallet with previous ATH of 13M."
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 2900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 3600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:18:49.470Z"
+  },
+  {
+    "token": {
+      "address": "BP7HeNkK4MzpQ6HGJLE3UV6NgUJwhc6C8EETZuYCpump",
+      "chainId": "ton",
+      "name": "i",
+      "symbol": "???",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/29856156ebd97f0fd4069d0d8656923ea0057c18d79181f7d10215908f95eb4d?width=64&height=64&fit=crop&quality=95&format=auto",
+      "twitter": "https://x.com/justdarkJDARK",
+      "description": "i will do nothing, you earn the gain."
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 2900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 3600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:19:02.367Z"
+  },
+  {
+    "token": {
+      "address": "8YZhzGJB9TGk3wJ6y2Jkq1SVYtT8VyBauCoK37gbonk",
+      "chainId": "ton",
+      "name": "Unknown",
+      "symbol": "???",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/e156746940d314f5c0513bda6e5f02099915e545fc29c8e7cd9cab88b7429fe5?width=64&height=64&fit=crop&quality=95&format=auto",
+      "website": "https://bonk.fun/token/8YZhzGJB9TGk3wJ6y2Jkq1SVYtT8VyBauCoK37gbonk",
+      "twitter": "https://x.com/i/communities/2006882094752891106"
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing website screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Analyzing website visuals for red flags...",
+        "timestamp": 3100,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 3900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 4900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 5600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:19:29.214Z"
+  },
+  {
+    "token": {
+      "address": "2LJcmUj7jcL3vubCdxndGk7XP67DeEzzBbkAu5qsaKes",
+      "chainId": "ton",
+      "name": "Send",
+      "symbol": "???",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/2e24f0dd1e0f70a114da1fdede43e63791296dc3d1cf152e3412e0e0c22eed02?width=64&height=64&fit=crop&quality=95&format=auto",
+      "website": "https://pump.fun/coin/A9ETY1xvjv1BETEobYwNDwnKeaF6Lj5BDXtRJhVNpump",
+      "twitter": "https://x.com/i/communities/2004619214837948456",
+      "description": "Send the fire horse, instead of this cabal shit!\n\nA9ETY1xvjv1BETEobYwNDwnKeaF6Lj5BDXtRJhVNpump"
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing website screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Analyzing website visuals for red flags...",
+        "timestamp": 3100,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 3900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 4900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 5600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:20:06.908Z"
+  },
+  {
+    "token": {
+      "address": "ZT3fQsTRbuDk24zNztUAWVHS3BAEGsT328uFeeApump",
+      "chainId": "ton",
+      "name": "Elon",
+      "symbol": "???",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/b951d5bfb9e76b6e156c4a2c063df1f757a71e238bea450c74c393891b151ebd?width=64&height=64&fit=crop&quality=95&format=auto",
+      "twitter": "https://x.com/grok/status/2006546133875876195?s=20",
+      "description": "Elon Bikinified"
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 2900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 3600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:20:20.302Z"
+  },
+  {
+    "token": {
+      "address": "CBYHRuuJaH1ntK3smoJqNVizQ7N2bc4mtfNf3YECbonk",
+      "chainId": "ton",
+      "name": "BEST",
+      "symbol": "???",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/5bb9ed28215f00fa2e29446735476bae1ff37f08d6ffd8ead57026f8519f63b6?width=64&height=64&fit=crop&quality=95&format=auto",
+      "twitter": "https://x.com/i/communities/2007163043348668585",
+      "description": "BEST USD1 NARRA:  KERMIT IS CURRENTLY is at an ATH on PUMPFUN AT 6M CAP.  \n\nI’ve found the best beta play for it: Sam the Eagle. Sam is a character from the same show.  \n\nHe’s an eagle who primarily represents the USA.   = THE PERFECT NARRA FOR USD1."
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 2900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 3600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:20:36.182Z"
+  },
+  {
+    "token": {
+      "address": "GCazDbM4UiLaQW3oajgKtCHsbZHQUJcZmVCMHXfTpump",
+      "chainId": "ton",
+      "name": "Tired",
+      "symbol": "200",
+      "imageUrl": "https://cdn.dexscreener.com/cms/images/ddda2adfdde4db6948094ab57abf80ff5ca79ff0303d1ae763d7684dbdb78189?width=64&height=64&fit=crop&quality=95&format=auto",
+      "website": "https://tinkerbots.app/",
+      "twitter": "https://x.com/BuildOnTinker",
+      "description": "Tired of seeing Prediction market bots turning $200 into Millions? Tinker lets you build your own. Clone, customize, deploy custom logic. No code required."
+    },
+    "audit": null,
+    "sherlock": null,
+    "stream": [
+      {
+        "step": "Initializing Sentinel analysis...",
+        "timestamp": 0,
+        "status": "complete"
+      },
+      {
+        "step": "Fetching token metadata from DexScreener...",
+        "timestamp": 500,
+        "status": "complete"
+      },
+      {
+        "step": "Retrieving market data (liquidity, volume, mcap)...",
+        "timestamp": 1300,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing website screenshot...",
+        "timestamp": 1900,
+        "status": "complete"
+      },
+      {
+        "step": "Analyzing website visuals for red flags...",
+        "timestamp": 3100,
+        "status": "complete"
+      },
+      {
+        "step": "Capturing Twitter profile screenshot...",
+        "timestamp": 3900,
+        "status": "complete"
+      },
+      {
+        "step": "Examining social presence and account age...",
+        "timestamp": 4900,
+        "status": "complete"
+      },
+      {
+        "step": "Compiling final verdict...",
+        "timestamp": 5600,
+        "status": "complete"
+      }
+    ],
+    "timestamp": "2026-01-02T20:20:57.179Z"
+  }
+]
