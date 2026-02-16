@@ -10,7 +10,8 @@ const MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
  * @param url The URL to screenshot
  * @param fullPage Whether to capture the full page or just the viewport
  */
-const SCREENSHOT_TIMEOUT_MS = 5000;
+const SCREENSHOT_TIMEOUT_MS = 15000;
+const FALLBACK_TIMEOUT_MS = 12000;
 
 export function getMicrolinkUrl(url: string, fullPage: boolean = false): string {
   const params = new URLSearchParams({
@@ -18,7 +19,7 @@ export function getMicrolinkUrl(url: string, fullPage: boolean = false): string 
     screenshot: "true",
     meta: "false",
     embed: "screenshot.url",
-    waitForTimeout: "5000",
+    waitForTimeout: "12000",
     waitUntil: "networkidle0",
   });
 
@@ -37,28 +38,6 @@ export function getMicrolinkUrl(url: string, fullPage: boolean = false): string 
   return `https://api.microlink.io/?${params.toString()}`;
 }
 
-/**
- * Generates a Microlink URL specifically for a Twitter/X profile
- * This is a workaround to "see" the profile without expensive APIs
- */
-export function getTwitterScreenshotUrl(handleOrUrl: string): string {
-  let handle = handleOrUrl;
-  
-  // Extract handle if full URL is provided
-  if (handleOrUrl.includes("twitter.com/") || handleOrUrl.includes("x.com/")) {
-    const parts = handleOrUrl.split("/");
-    handle = parts[parts.length - 1].split("?")[0];
-  }
-  
-  // Remove @ if present
-  handle = handle.replace("@", "");
-  
-  const twitterUrl = `https://twitter.com/${handle}`;
-  
-  // For Twitter, we want the viewport, not full page, to focus on bio/stats
-  return getMicrolinkUrl(twitterUrl, false);
-}
-
 export interface ScreenshotResult {
   base64: string;
   mimeType: string;
@@ -73,7 +52,7 @@ export interface ScreenshotResult {
 export async function saveScreenshotToPublicDir(
   base64: string,
   mimeType: string,
-  prefix: "website" | "twitter" = "website"
+  prefix: "website" = "website"
 ): Promise<{ path: string; publicUrl: string }> {
   await mkdir(SCREENSHOTS_DIR, { recursive: true });
   const ext = mimeType.includes("png") ? "png" : "jpg";
@@ -113,13 +92,36 @@ export async function cleanupOldScreenshots(): Promise<number> {
 }
 
 /**
+ * Fallback: fetch screenshot via Thum.io when Microlink fails or times out.
+ * Returns base64 image or null.
+ */
+async function fetchViaThumIo(originalUrl: string): Promise<ScreenshotResult | null> {
+  try {
+    const thumUrl = `https://image.thum.io/get/width/1200/crop/800/${encodeURIComponent(originalUrl)}`;
+    const response = await fetch(thumUrl, {
+      signal: AbortSignal.timeout(FALLBACK_TIMEOUT_MS),
+    });
+    if (!response.ok) return null;
+    const arrayBuffer = await response.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString("base64");
+    const mimeType = response.headers.get("content-type") || "image/jpeg";
+    console.log(`[Veritas Paparazzi] Fallback (Thum.io) captured (${Math.round(arrayBuffer.byteLength / 1024)}KB)`);
+    return { base64, mimeType };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Fetches the screenshot image and returns it as base64 (and optionally saves to disk).
- * Uses unique filenames (scan-{prefix}-{uuid}.png) when saving to avoid race conditions.
+ * Tries Microlink first (15s timeout); on failure falls back to Thum.io.
  */
 export async function fetchScreenshotAsBase64(
   url: string,
-  options?: { saveToDisk?: boolean; prefix?: "website" | "twitter" }
+  options?: { saveToDisk?: boolean; prefix?: "website"; originalUrl?: string }
 ): Promise<ScreenshotResult | null> {
+  const originalUrl = options?.originalUrl ?? (url.includes("api.microlink.io") ? undefined : url);
+
   try {
     console.log("[Veritas Paparazzi] 📸 Snapping photo...");
     const fetchUrl = url.includes("api.microlink.io") ? url : getMicrolinkUrl(url);
@@ -128,8 +130,7 @@ export async function fetchScreenshotAsBase64(
     });
 
     if (!response.ok) {
-      console.warn("[Veritas Paparazzi] Failed to capture screenshot:", response.status);
-      return null;
+      throw new Error(`Microlink ${response.status}`);
     }
 
     const arrayBuffer = await response.arrayBuffer();
@@ -142,17 +143,22 @@ export async function fetchScreenshotAsBase64(
     if (options?.saveToDisk && process.env.VERITAS_SAVE_SCREENSHOTS === "true") {
       await cleanupOldScreenshots();
       const prefix = options.prefix ?? "website";
-      const { publicUrl: url } = await saveScreenshotToPublicDir(base64, mimeType, prefix);
-      publicUrl = url;
+      const { publicUrl: savedUrl } = await saveScreenshotToPublicDir(base64, mimeType, prefix);
+      publicUrl = savedUrl;
     }
 
     return { base64, mimeType, ...(publicUrl && { publicUrl }) };
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      console.warn("[Veritas Paparazzi] Screenshot timeout (5s) — skipping");
+      console.warn("[Veritas Paparazzi] Microlink timeout (15s) — trying fallback");
     } else {
-      console.warn("[Veritas Paparazzi] Camera malfunction:", error);
+      console.warn("[Veritas Paparazzi] Microlink failed, falling back to secondary screenshot service:", error instanceof Error ? error.message : error);
     }
+    if (originalUrl) {
+      const fallback = await fetchViaThumIo(originalUrl);
+      if (fallback) return fallback;
+    }
+    console.warn("[Veritas Paparazzi] Fallback screenshot also failed — no image for this source");
     return null;
   }
 }

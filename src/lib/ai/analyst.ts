@@ -419,11 +419,7 @@ export async function runDeepInvestigation(
     websiteImage = await fetchScreenshotAsBase64(fullPageUrl);
   }
 
-  if (twitterUrl) {
-    // Use standard viewport for Twitter to see the profile header/bio
-    const twitterScreenshotUrl = `https://api.microlink.io/?url=${encodeURIComponent(twitterUrl)}&screenshot=true&meta=false&embed=screenshot.url&waitForTimeout=4000&waitUntil=networkidle0`;
-    twitterImage = await fetchScreenshotAsBase64(twitterScreenshotUrl);
-  }
+  // Twitter screenshots removed — no security value (same UI for all profiles)
 
   // 2. Build the Case File (Prompt)
   const prompt = `
@@ -493,11 +489,12 @@ export async function runDeepInvestigation(
   }
 
   if (twitterImage) {
+    const timg: any = twitterImage;
     parts.push({
       inlineData: {
-        mimeType: twitterImage.mimeType,
-        data: twitterImage.base64
-      }
+        mimeType: timg.mimeType,
+        data: timg.base64,
+      },
     });
   }
 

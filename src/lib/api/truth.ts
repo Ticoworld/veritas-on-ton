@@ -6,11 +6,7 @@
 import { getTokenSocials } from "./dexscreener";
 import { getMarketAnalysis, type MarketAnalysis } from "./market";
 import { getCreatorHistory, type CreatorTokenHistory } from "./historian";
-import {
-  fetchScreenshotAsBase64,
-  getMicrolinkUrl,
-  getTwitterScreenshotUrl,
-} from "./screenshot";
+import { fetchScreenshotAsBase64, getMicrolinkUrl } from "./screenshot";
 import type { TokenSocials } from "@/types";
 
 // =============================================================================
@@ -161,18 +157,7 @@ export async function fetchTruthData(address: string): Promise<TruthData> {
     );
   }
 
-  if (tokenProfile.twitter) {
-    screenshotPromises.push(
-      (async () => {
-        try {
-          const url = getTwitterScreenshotUrl(tokenProfile.twitter!);
-          twitterScreenshot = await fetchScreenshotAsBase64(url);
-        } catch (e) {
-          console.warn("[Truth Engine] Twitter screenshot failed:", e);
-        }
-      })()
-    );
-  }
+  // Twitter screenshots removed — no security value (same UI for all profiles)
 
   // Wait for screenshots (with timeout protection built into fetchScreenshotAsBase64)
   await Promise.all(screenshotPromises);

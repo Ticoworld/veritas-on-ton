@@ -12,6 +12,7 @@ import {
   isInitializeRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { VeritasInvestigator } from "@/lib/services/VeritasInvestigator";
+import { BotAnalysisOutput } from "@/types";
 
 const app = express();
 const port = Number(process.env.MCP_PORT || process.env.PORT || 4000);
@@ -39,153 +40,45 @@ const outputSchema = {
   properties: {
     trustScore: { type: "number" },
     verdict: { type: "string", enum: ["Safe", "Caution", "Danger"] },
-    summary: { type: "string" },
-    criminalProfile: { type: "string" },
-    lies: {
-      type: "array",
-      description: "Contains at least one entry (e.g., 'None detected')",
-      items: { type: "string" },
-    },
-    evidence: { type: "array", items: { type: "string" } },
-    analysis: { type: "array", items: { type: "string" } },
-    visualAnalysis: { type: ["string", "null"] },
-    degenComment: { type: "string" },
-    thoughtSummary: { type: ["string", "null"] },
-    tokenAddress: { type: "string" },
-    tokenName: { type: "string" },
-    tokenSymbol: { type: "string" },
     onChain: {
       type: "object",
       properties: {
-        mintAuth: { type: "string", enum: ["Enabled", "Disabled"] },
-        freezeAuth: { type: "string", enum: ["Enabled", "Disabled"] },
-        mintAuthStatus: { type: "string", enum: ["Enabled", "Disabled"] },
-        freezeAuthStatus: { type: "string", enum: ["Enabled", "Disabled"] },
-        supply: { type: "number" },
-        decimals: { type: "number" },
-        top10Percentage: { type: "number" },
-        creatorPercentage: { type: "number" },
+        mintAuthorityEnabled: { type: "boolean" },
+        freezeAuthorityEnabled: { type: "boolean" },
         isDumped: { type: "boolean" },
         isWhale: { type: "boolean" },
+        top10Percentage: { type: "number" },
+        creatorPercentage: { type: "number" },
       },
       required: [
-        "mintAuth",
-        "freezeAuth",
-        "mintAuthStatus",
-        "freezeAuthStatus",
-        "supply",
-        "decimals",
-        "top10Percentage",
-        "creatorPercentage",
+        "mintAuthorityEnabled",
+        "freezeAuthorityEnabled",
         "isDumped",
         "isWhale",
+        "top10Percentage",
+        "creatorPercentage",
       ],
     },
     market: {
       type: "object",
       properties: {
-        liquidity: { type: "number" },
-        volume24h: { type: "number" },
-        marketCap: { type: "number" },
-        buySellRatio: { type: "number" },
-        ageInHours: { type: "number" },
-        botActivity: { type: "string" },
-        anomalies: {
-          type: "array",
-          description: "Contains at least one entry (e.g., 'None detected')",
-          items: { type: "string" },
-        },
-        anomaliesSummary: {
-          type: "string",
-          description: "Human-readable summary; 'None detected' when empty.",
-        },
+        botActivity: { type: "string", enum: ["Low", "Medium", "High", "Unknown"] },
+        washTradeScore: { type: "number" },
+        liquidity: { type: ["number", "null"] },
+        volume24h: { type: ["number", "null"] },
+        marketCap: { type: ["number", "null"] },
       },
-    },
-    marketAvailable: { type: "boolean" },
-    dataCompleteness: {
-      type: "string",
-      enum: ["complete"],
-      description: "Signals that the response is complete and ready to use.",
-    },
-    rugCheck: {
-      type: "object",
-      properties: {
-        score: { type: "number" },
-        risks: {
-          type: "array",
-          description:
-            "Contains at least one entry (e.g., a 'None detected' placeholder)",
-          items: {
-            type: "object",
-            properties: {
-              name: { type: "string" },
-              description: { type: "string" },
-              level: { type: "string" },
-              score: { type: "number" },
-            },
-            required: ["name", "description", "level", "score"],
-          },
-        },
-        risksSummary: {
-          type: "string",
-          description: "Human-readable summary; 'None detected' when empty.",
-        },
-      },
-    },
-    rugCheckAvailable: { type: "boolean" },
-    creatorHistory: {
-      type: "object",
-      properties: {
-        creatorAddress: { type: "string" },
-        previousTokens: { type: "number" },
-        isSerialLauncher: { type: "boolean" },
-      },
-      required: ["creatorAddress", "previousTokens", "isSerialLauncher"],
-    },
-    socials: {
-      type: "object",
-      properties: {
-        website: { type: ["string", "null"] },
-        twitter: { type: ["string", "null"] },
-        telegram: { type: ["string", "null"] },
-        discord: { type: ["string", "null"] },
-      },
+      required: ["botActivity", "washTradeScore"],
     },
     elephantMemory: {
       type: "object",
       properties: {
         isKnownScammer: { type: "boolean" },
-        previousFlags: { type: ["object", "null"] },
       },
       required: ["isKnownScammer"],
     },
-    analyzedAt: { type: "string" },
-    analysisTimeMs: { type: "number" },
   },
-  required: [
-    "trustScore",
-    "verdict",
-    "summary",
-    "criminalProfile",
-    "lies",
-    "evidence",
-    "analysis",
-    "degenComment",
-    "tokenAddress",
-    "tokenName",
-    "tokenSymbol",
-    "onChain",
-    "market",
-    "marketAvailable",
-    "dataCompleteness",
-    "rugCheck",
-    "rugCheckAvailable",
-    "creatorHistory",
-    "socials",
-    "elephantMemory",
-    "analyzedAt",
-    "analysisTimeMs",
-  ],
+  required: ["trustScore", "verdict", "onChain", "market", "elephantMemory"],
 } as const;
 const toolDefinition = {
   name: "analyze_token",
@@ -240,73 +133,33 @@ mcpServer.server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     const investigator = new VeritasInvestigator();
     const result = await investigator.investigate(tokenAddress);
-    const onChain = result.onChain;
-    const marketAvailable = result.market !== null;
-    const market = result.market ?? {
-      liquidity: 0,
-      volume24h: 0,
-      marketCap: 0,
-      buySellRatio: 0,
-      ageInHours: 0,
-      botActivity: "Unknown",
-      anomalies: [],
-      anomaliesSummary: "None detected",
-    };
-    const rugCheckAvailable = result.rugCheck !== null;
-    const rugCheck = result.rugCheck ?? {
-      score: 0,
-      risks: [],
-      risksSummary: "None detected",
-    };
-    const normalizedMarket = {
-      ...market,
-      anomalies: market.anomalies && market.anomalies.length > 0
-        ? market.anomalies
-        : ["None detected"],
-      anomaliesSummary:
-        market.anomalies && market.anomalies.length > 0
-          ? market.anomalies.join("; ")
-          : "None detected",
-    };
-    const normalizedRugCheck = {
-      ...rugCheck,
-      risks:
-        rugCheck.risks && rugCheck.risks.length > 0
-          ? rugCheck.risks
-          : [
-              {
-                name: "None detected",
-                description: "No risks detected. TODO: Replace with TON API contract audit.",
-                level: "info",
-                score: 0,
-              },
-            ],
-      risksSummary:
-        rugCheck.risks && rugCheck.risks.length > 0
-          ? rugCheck.risks.map((risk) => risk.name).join("; ")
-          : "None detected",
-    };
-    const normalizedLies =
-      result.lies && result.lies.length > 0 ? result.lies : ["None detected"];
-    const mcpResult = {
-      ...result,
-      lies: normalizedLies,
+
+    const botOutput: BotAnalysisOutput = {
+      trustScore: result.trustScore,
+      verdict: result.verdict,
       onChain: {
-        ...onChain,
-        mintAuth: onChain.mintAuth ? "Enabled" : "Disabled",
-        freezeAuth: onChain.freezeAuth ? "Enabled" : "Disabled",
-        mintAuthStatus: onChain.mintAuth ? "Enabled" : "Disabled",
-        freezeAuthStatus: onChain.freezeAuth ? "Enabled" : "Disabled",
+        mintAuthorityEnabled: Boolean(result.onChain?.mintAuth),
+        freezeAuthorityEnabled: Boolean(result.onChain?.freezeAuth),
+        isDumped: Boolean(result.onChain?.isDumped),
+        isWhale: Boolean(result.onChain?.isWhale),
+        top10Percentage: Number(result.onChain?.top10Percentage ?? 0),
+        creatorPercentage: Number(result.onChain?.creatorPercentage ?? 0),
       },
-      market: normalizedMarket,
-      marketAvailable,
-      rugCheck: normalizedRugCheck,
-      rugCheckAvailable,
-      dataCompleteness: "complete",
+      market: {
+        botActivity: (result.market?.botActivity as any) ?? "Unknown",
+        washTradeScore: Number((result.market as any)?.washTradeScore ?? 0),
+        liquidity: result.market?.liquidity ?? undefined,
+        volume24h: result.market?.volume24h ?? undefined,
+        marketCap: result.market?.marketCap ?? undefined,
+      },
+      elephantMemory: {
+        isKnownScammer: Boolean(result.elephantMemory?.isKnownScammer),
+      },
     };
+
     return {
-      content: [{ type: "text" as const, text: JSON.stringify(mcpResult, null, 2) }],
-      structuredContent: mcpResult,
+      content: [{ type: "text" as const, text: JSON.stringify(botOutput, null, 2) }],
+      structuredContent: botOutput,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -459,9 +312,31 @@ streamableServer.setRequestHandler(CallToolRequestSchema, async (request) => {
       rugCheckAvailable,
       dataCompleteness: "complete",
     };
+    const botOutput: BotAnalysisOutput = {
+      trustScore: result.trustScore,
+      verdict: result.verdict,
+      onChain: {
+        mintAuthorityEnabled: Boolean(result.onChain?.mintAuth),
+        freezeAuthorityEnabled: Boolean(result.onChain?.freezeAuth),
+        isDumped: Boolean(result.onChain?.isDumped),
+        isWhale: Boolean(result.onChain?.isWhale),
+        top10Percentage: Number(result.onChain?.top10Percentage ?? 0),
+        creatorPercentage: Number(result.onChain?.creatorPercentage ?? 0),
+      },
+      market: {
+        botActivity: (result.market?.botActivity as any) ?? "Unknown",
+        washTradeScore: Number((result.market as any)?.washTradeScore ?? 0),
+        liquidity: result.market?.liquidity ?? undefined,
+        volume24h: result.market?.volume24h ?? undefined,
+        marketCap: result.market?.marketCap ?? undefined,
+      },
+      elephantMemory: {
+        isKnownScammer: Boolean(result.elephantMemory?.isKnownScammer),
+      },
+    };
     return {
-      content: [{ type: "text" as const, text: JSON.stringify(mcpResult, null, 2) }],
-      structuredContent: mcpResult,
+      content: [{ type: "text" as const, text: JSON.stringify(botOutput, null, 2) }],
+      structuredContent: botOutput,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

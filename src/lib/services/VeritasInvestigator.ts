@@ -15,7 +15,7 @@ import { getTokenInfo, getHolderDistribution, validateAddress } from "@/lib/bloc
 import { getTokenSocials } from "@/lib/api/dexscreener";
 import { getMarketAnalysis } from "@/lib/api/market";
 import { getCreatorHistory } from "@/lib/api/historian";
-import { fetchScreenshotAsBase64, getMicrolinkUrl } from "@/lib/api/screenshot";
+import { fetchScreenshotAsBase64, getMicrolinkUrl, type ScreenshotResult } from "@/lib/api/screenshot";
 import { fetchTonSecurity, type TonSecurityReport } from "@/lib/api/tonsecurity";
 import { runUnifiedAnalysis, type UnifiedAnalysisInput, type UnifiedAnalysisResult } from "@/lib/ai/unified-analyzer";
 import { checkKnownScammer, flagScammer, type ScammerRecord } from "@/lib/db/elephant";
@@ -192,39 +192,29 @@ export class VeritasInvestigator {
     }
     
     // =========================================================================
-    // PHASE 3: SCREENSHOT CAPTURE (Visual Evidence)
+    // PHASE 3: SCREENSHOT CAPTURE (Visual Evidence — project website only)
     // =========================================================================
-    console.log("[Veritas Investigator] 📸 Phase 3: Capturing visual evidence...");
-    
     const websiteUrl = socials?.website;
     const twitterUrl = socials?.twitter;
-    
-    // Convert Twitter to Nitter for better bot access
-    let nitterUrl = twitterUrl;
-    if (nitterUrl) {
-      nitterUrl = nitterUrl
-        .replace('https://x.com/', 'https://nitter.net/')
-        .replace('https://twitter.com/', 'https://nitter.net/');
+
+    const hasWebsite =
+      websiteUrl != null &&
+      String(websiteUrl).trim() !== "" &&
+      String(websiteUrl).trim().toLowerCase() !== "none";
+
+    let websiteScreenshot: ScreenshotResult | null = null;
+    if (hasWebsite) {
+      console.log("[Veritas Investigator] 📸 Phase 3: Capturing website screenshot...");
+      const saveScreenshots = process.env.VERITAS_SAVE_SCREENSHOTS === "true";
+      websiteScreenshot = await fetchScreenshotAsBase64(getMicrolinkUrl(websiteUrl!.trim(), true), {
+        saveToDisk: saveScreenshots,
+        prefix: "website",
+        originalUrl: websiteUrl!.trim(),
+      });
+      if (websiteScreenshot) console.log("[Veritas Investigator] ✅ Website screenshot captured");
+    } else {
+      console.log("[Veritas Investigator] ⏭️ Phase 3: No website URL — skipping screenshot");
     }
-    
-    const saveScreenshots = process.env.VERITAS_SAVE_SCREENSHOTS === "true";
-    const [websiteScreenshot, twitterScreenshot] = await Promise.all([
-      websiteUrl
-        ? fetchScreenshotAsBase64(getMicrolinkUrl(websiteUrl, true), {
-            saveToDisk: saveScreenshots,
-            prefix: "website",
-          })
-        : Promise.resolve(null),
-      twitterUrl
-        ? fetchScreenshotAsBase64(getMicrolinkUrl(twitterUrl, false), {
-            saveToDisk: saveScreenshots,
-            prefix: "twitter",
-          })
-        : Promise.resolve(null),
-    ]);
-    
-    if (websiteScreenshot) console.log("[Veritas Investigator] ✅ Website screenshot captured");
-    if (twitterScreenshot) console.log("[Veritas Investigator] ✅ Twitter screenshot captured");
     
     // =========================================================================
     // PHASE 4: AI ANALYSIS (Unified Analyzer - "Sherlock")
@@ -244,8 +234,8 @@ export class VeritasInvestigator {
       creatorPercentage: creatorStatus.creatorPercentage,
       isDumped: creatorStatus.isDumped,
       isWhale: creatorStatus.isWhale,
-      websiteUrl,
-      twitterUrl: nitterUrl,
+      websiteUrl: hasWebsite ? websiteUrl : undefined,
+      twitterUrl,
       marketData: marketData ? {
         liquidity: marketData.liquidity,
         volume24h: marketData.volume24h,
@@ -253,8 +243,10 @@ export class VeritasInvestigator {
         buySellRatio: marketData.buySellRatio,
       } : undefined,
       websiteScreenshot: websiteScreenshot || undefined,
-      twitterScreenshot: twitterScreenshot || undefined,
       isPumpFun: false,
+      missingWebsiteFlag: !hasWebsite
+        ? "Flag: No Website Detected. This indicates a very high risk of a low-effort rug pull."
+        : undefined,
     };
     
     const aiResult = await runUnifiedAnalysis(analysisInput);

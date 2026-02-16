@@ -25,7 +25,7 @@ export interface TokenAnalysis {
   
   // Holder distribution
   topHolders: { address: string; balance: number; percentage: number }[];
-  topHoldersPercentage: number;
+  top10Percentage: number;
   
   // Risk assessment
   riskFactors: RiskFactor[];
@@ -114,7 +114,7 @@ function getCreatorAnalysis(
 function calculateRiskScore(
   mintAuthority: string | null,
   freezeAuthority: string | null,
-  topHoldersPercentage: number
+  top10Percentage: number
 ): { score: number; level: RiskLevel; factors: RiskFactor[] } {
   const factors: RiskFactor[] = [];
   let score = 0;
@@ -160,30 +160,30 @@ function calculateRiskScore(
   }
 
   // Holder Concentration Check (Variable - up to 40 points)
-  if (topHoldersPercentage > 80) {
+  if (top10Percentage > 80) {
     score += 40;
     factors.push({
       id: "holder_concentration",
       name: "Holder Distribution",
-      description: `Critical: Top 10 holders control ${topHoldersPercentage.toFixed(1)}% of supply.`,
+      description: `Critical: Top 10 holders control ${top10Percentage.toFixed(1)}% of supply.`,
       severity: "critical",
       weight: 40,
     });
-  } else if (topHoldersPercentage > 60) {
+  } else if (top10Percentage > 60) {
     score += 30;
     factors.push({
       id: "holder_concentration",
       name: "Holder Distribution",
-      description: `Warning: Top 10 holders control ${topHoldersPercentage.toFixed(1)}% of supply.`,
+      description: `Warning: Top 10 holders control ${top10Percentage.toFixed(1)}% of supply.`,
       severity: "high",
       weight: 30,
     });
-  } else if (topHoldersPercentage > 40) {
+  } else if (top10Percentage > 40) {
     score += 15;
     factors.push({
       id: "holder_concentration",
       name: "Holder Distribution",
-      description: `Moderate: Top 10 holders control ${topHoldersPercentage.toFixed(1)}% of supply.`,
+      description: `Moderate: Top 10 holders control ${top10Percentage.toFixed(1)}% of supply.`,
       severity: "medium",
       weight: 15,
     });
@@ -191,7 +191,7 @@ function calculateRiskScore(
     factors.push({
       id: "holder_concentration",
       name: "Holder Distribution",
-      description: `Healthy: Top 10 holders control ${topHoldersPercentage.toFixed(1)}% of supply.`,
+      description: `Healthy: Top 10 holders control ${top10Percentage.toFixed(1)}% of supply.`,
       severity: "safe",
       weight: 0,
     });
@@ -227,7 +227,7 @@ export async function analyzeToken(address: string): Promise<AuditResult> {
   const freezeAuthority = (mintInfo.freezeAuthority as string) || null;
 
   // Fetch holder distribution. TODO: Replace with TON API.
-  const { topHolders, topHoldersPercentage } = await getHolderDistribution(
+  const { topHolders, top10Percentage } = await getHolderDistribution(
     address,
     supply,
     decimals
@@ -245,7 +245,7 @@ export async function analyzeToken(address: string): Promise<AuditResult> {
   const mathBased = calculateRiskScore(
     mintAuthority,
     freezeAuthority,
-    topHoldersPercentage
+    top10Percentage
   );
 
   // Fetch social links FIRST (needed for vision analysis)
@@ -305,7 +305,7 @@ export async function analyzeToken(address: string): Promise<AuditResult> {
     aiResult = await analyzeTokenRisk({
       mintAuth: mintAuthority,
       freezeAuth: freezeAuthority,
-      top10Percentage: topHoldersPercentage,
+      top10Percentage: top10Percentage,
       supply,
       decimals,
       // Pass creator data to AI
@@ -361,7 +361,7 @@ export async function analyzeToken(address: string): Promise<AuditResult> {
     if (freezeAuthority) {
       recommendations.push("Freeze authority is enabled - your tokens could be frozen.");
     }
-    if (topHoldersPercentage > 50) {
+    if (top10Percentage > 50) {
       recommendations.push("High holder concentration - vulnerable to whale dumps.");
     }
     if (mathBased.score < 20 && !creatorStatus.isDumped) {

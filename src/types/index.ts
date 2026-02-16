@@ -174,3 +174,30 @@ export interface WatchtowerQueueItem {
   riskScore?: number;
   verdict?: 'Safe' | 'Caution' | 'Danger';
 }
+
+/**
+ * Minimal, strict output shape intended for autonomous agents (bots).
+ * Contains only machine-readable fields — no narrative or prose.
+ */
+export interface BotAnalysisOutput {
+  trustScore: number; // 0-100, higher = safer
+  verdict: 'Safe' | 'Caution' | 'Danger';
+  onChain: {
+    mintAuthorityEnabled: boolean;
+    freezeAuthorityEnabled: boolean;
+    isDumped: boolean;
+    isWhale: boolean;
+    top10Percentage: number;
+    creatorPercentage: number;
+  };
+  market: {
+    botActivity: 'Low' | 'Medium' | 'High' | 'Unknown';
+    washTradeScore: number;
+    liquidity?: number;
+    volume24h?: number;
+    marketCap?: number;
+  };
+  elephantMemory: {
+    isKnownScammer: boolean;
+  };
+}

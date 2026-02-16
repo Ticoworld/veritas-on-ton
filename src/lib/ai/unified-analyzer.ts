@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Veritas Unified Analyzer v2.0
  * Single call to Gemini with URL Context + Google Search grounding
  * Replaces the two-phase Scanner + Sherlock flow
@@ -70,9 +70,11 @@ export interface UnifiedAnalysisInput {
     buySellRatio: number;
   };
   
-  // Screenshots for vision analysis (PRIMARY evidence source)
+  // Screenshot for vision analysis (project website only)
   websiteScreenshot?: { base64: string; mimeType: string };
-  twitterScreenshot?: { base64: string; mimeType: string };
+
+  /** Injected when no website URL — critical risk flag for Gemini */
+  missingWebsiteFlag?: string;
 
   // Pump.fun context (mint ends with "pump")
   isPumpFun?: boolean;
@@ -110,12 +112,11 @@ This mint ends in "pump" — it is a **Pump.fun launch**. The contract is the sa
 - Low-effort websites are common for meme coins; judge memes by community and distribution, not by "professional" site quality.
 ` : '';
 
-  // Vision instructions - CRITICAL for when URL Context fails
-  // TIER S FEATURE: Visual Asset Reuse Detection via Gemini Vision
+  // Vision instructions — project website screenshot only
   const visionInstructions = hasScreenshot ? `
-## ⚠️ CRITICAL: VISUAL ASSET REUSE DETECTION (TIER S - GEMINI VISION)
-I have attached up to TWO screenshots. URL Context will FAIL - ignore that. USE THE SCREENSHOTS.
-**YOU ARE PERFORMING COMPUTER VISION ANALYSIS.** Your visualAnalysis field proves Gemini actually saw and analyzed the images.
+## ⚠️ CRITICAL: VISUAL ASSET REUSE DETECTION (GEMINI VISION)
+I have attached ONE screenshot (the project website). URL Context will FAIL - ignore that. USE THE SCREENSHOT.
+**YOU ARE PERFORMING COMPUTER VISION ANALYSIS.** Your visualAnalysis field proves Gemini actually saw and analyzed the image.
 
 ### STEP 1: ENUMERATE EVERY SECTION YOU SEE
 Go through the website screenshot FROM TOP TO BOTTOM and list out EVERY section:
@@ -134,14 +135,65 @@ Go through the website screenshot FROM TOP TO BOTTOM and list out EVERY section:
 - Stock images or AI-generated art that looks templated?
 **State explicitly in visualAnalysis: "VISUAL ASSET REUSE: [YES/NO]. [Specific evidence from what you SEE in the screenshot]."**
 
-### STEP 3: READ THE TWITTER SCREENSHOT  
-- Account name, bio, verified status
-- Follower/following count
-- Join date
-- Pinned tweet content
-
 **DO NOT SUMMARIZE AS "MINIMALIST" UNLESS YOU HAVE ENUMERATED EVERY SECTION AND CONFIRMED THERE IS NOTHING BELOW THE HERO.**
 ` : '';
+
+  // When screenshot capture failed: forbid visual hallucination and restrict to text-only analysis
+  const noScreenshotInstructions = !hasScreenshot ? `
+## ⚠️ NO SCREENSHOTS AVAILABLE — TEXT-ONLY ANALYSIS
+Screenshot capture timed out or failed. You have **NO image data**. 
+- Do NOT describe, infer, or hallucinate any visual content (e.g. "the website shows...", "the design looks...", "the hero section displays...").
+- Do NOT invent what the website or Twitter might look like based on the token name or ticker.
+- Base your analysis ONLY on the text metadata below (on-chain, market, URLs). The visualAnalysis field will be set by the system; do not fabricate visual findings.
+` : '';
+
+  const missingWebsiteFlagSection = data.missingWebsiteFlag ? `
+## 🚨 CRITICAL RISK FLAG (AUTO-INJECTED)
+**${data.missingWebsiteFlag}**
+` : '';
+
+  const investigationSteps = hasScreenshot ? `
+# INVESTIGATION STEPS
+
+## Step 1: VISION ANALYSIS (PRIMARY - MANDATORY)
+**READ EVERY WORD IN THE WEBSITE SCREENSHOT.**
+Go section by section from top to bottom:
+1. Hero section - what's visible?
+2. **Scroll down mentally** - is there a section titled "TOKENOMICS"? If yes, what does it say?
+3. Is there a section titled "SOCIALS"? If yes, list the social platforms
+4. Any other sections (About, Roadmap, Team)?
+5. Footer - any disclaimers or warnings?
+
+## Step 2: URL CONTEXT (Will probably fail - don't penalize for this)
+Try to access the URLs if you want, but they will likely return ERROR.
+
+## Step 3: GOOGLE SEARCH (VERIFY)
+Search for:
+- "${data.tokenName} scam" or "rugpull"
+- Any news or reports about this project
+
+## Step 4: CROSS-EXAMINE
+Compare what the SCREENSHOT shows vs ON-CHAIN TRUTH.
+- If screenshot shows contract address, does it match ${data.tokenAddress}?
+- If website claims "renounced", does on-chain confirm this?
+- Lies = website claims contradict on-chain data
+` : `
+# INVESTIGATION STEPS (TEXT-ONLY — NO SCREENSHOTS)
+
+## Step 1: METADATA ANALYSIS (ONLY SOURCE)
+Use ONLY the on-chain and market data above. Do NOT claim to have seen any website or Twitter screenshot. Do not describe or infer visual content.
+
+## Step 2: URL CONTEXT (Optional)
+Try to access the URLs if you want, but they will likely return ERROR.
+
+## Step 3: GOOGLE SEARCH (VERIFY)
+Search for:
+- "${data.tokenName} scam" or "rugpull"
+- Any news or reports about this project
+
+## Step 4: CROSS-EXAMINE
+Compare URL/search findings with on-chain truth. Do not invent visual evidence.
+`;
 
   return `
 You are **VERITAS**, a forensic crypto investigator who combines the deductive reasoning of Sherlock Holmes with the street smarts of a veteran degen who has survived 1,000 rug pulls.
@@ -164,40 +216,13 @@ Your mission: Investigate this token and **FIND LIES, CONTRADICTIONS, and RED FL
 ${marketSection}
 ${pumpFunSection}
 ${visionInstructions}
+${noScreenshotInstructions}
+${missingWebsiteFlagSection}
 
-## WEBSITES (URLs provided, but they will likely fail - USE SCREENSHOTS)
+## WEBSITES (URLs provided, but they will likely fail - USE SCREENSHOT)
 ${data.websiteUrl ? `- Project Website: ${data.websiteUrl}` : '- No website provided (RED FLAG)'}
 ${data.twitterUrl ? `- Twitter/X: ${data.twitterUrl}` : '- No Twitter provided'}
-
-# INVESTIGATION STEPS
-
-## Step 1: VISION ANALYSIS (PRIMARY - MANDATORY)
-**READ EVERY WORD IN THE SCREENSHOTS.**
-For the WEBSITE screenshot, go section by section from top to bottom:
-1. Hero section - what's visible?
-2. **Scroll down mentally** - is there a section titled "TOKENOMICS"? If yes, what does it say?
-3. Is there a section titled "SOCIALS"? If yes, list the social platforms
-4. Any other sections (About, Roadmap, Team)?
-5. Footer - any disclaimers or warnings?
-
-For the TWITTER screenshot:
-1. Read the profile name, bio, follower count
-2. Read the join date
-3. Read any pinned tweets or recent posts visible
-
-## Step 2: URL CONTEXT (Will probably fail - don't penalize for this)
-Try to access the URLs if you want, but they will likely return ERROR.
-
-## Step 3: GOOGLE SEARCH (VERIFY)
-Search for:
-- "${data.tokenName} scam" or "rugpull"
-- Any news or reports about this project
-
-## Step 4: CROSS-EXAMINE
-Compare what the SCREENSHOTS show vs ON-CHAIN TRUTH.
-- If screenshot shows contract address, does it match ${data.tokenAddress}?
-- If website claims "renounced", does on-chain confirm this?
-- Lies = website claims contradict on-chain data
+${investigationSteps}
 
 # OUTPUT FORMAT
 
@@ -221,20 +246,19 @@ Respond with ONLY this JSON:
     "<Market analysis>",
     "<Website assessment>"
   ],
-  "visualAnalysis": "<MANDATORY when screenshots provided: Describe exactly what you SAW. MUST include 'VISUAL ASSET REUSE: [YES/NO]' and specific evidence (template design, fake logos, recycled imagery, layout) - this proves Gemini Vision analyzed the image>",
+  "visualAnalysis": "${hasScreenshot ? "MANDATORY: Describe exactly what you SAW in the screenshots. MUST include 'VISUAL ASSET REUSE: [YES/NO]' and specific evidence (template design, fake logos, recycled imagery, layout)." : "Leave empty or omit — system will set this field."}",
   "degenComment": "<NOW SWITCH TO DEGEN MODE: 2-3 short sentences. Use slang. Use emojis. Be brutally honest. Give street-level advice. Examples: 'Ser this is a honeypot fr. You can buy but can't sell 🚫' or 'Template site, dev dumped, it's giving rug energy ngl' or 'Actually looks solid. Low risk, just volatile af 📊'>"
 }
 
-# SCORING RULES
-- Mint/Freeze ENABLED = Maximum 30 trust score
-- Creator DUMPED = Maximum 20 trust score  
-- Website is just "BUY NOW" button = Maximum 50 trust score
-- No roadmap/team/utility = Maximum 55 trust score
-- Claims contradict on-chain = -20 from trust score
-- Template/low-effort site = -15 from trust score
-- VISUAL ASSET REUSE DETECTED (scam template, fake logos, recycled design) = -25 from trust score, flag in lies
-- Healthy on-chain + minimal website = 45-60 trust score (Caution)
-- Don't give 100% to meme coins with template sites!
+# SCORING RULES (Your trustScore must strictly respect these caps)
+- Mint/Freeze ENABLED = Max 30
+- Creator DUMPED ALL = Max 45
+- Template/scam website = Max 50
+- VISUAL ASSET REUSE detected = trustScore -25
+- Clean on-chain + no website = 55-70 (Caution - not enough info for Safe)
+- Clean on-chain + legit website = 70-88
+- Don't score above 88 for ANY meme coin.
+- If the CRITICAL RISK FLAG states "No Website Detected", the MAXIMUM score is 30 and verdict MUST be Danger.
 ${data.isPumpFun ? '- PUMP.FUN: Ignore honeypot/contract risk. Score mainly on dev holdings, distribution, and social vibes.' : ''}
 `;
 }
@@ -299,10 +323,10 @@ export async function runUnifiedAnalysis(
   console.log(`[Unified Analyzer] 🕵️ Starting investigation for ${data.tokenName}...`);
   console.log(`[Unified Analyzer] URLs: Website=${data.websiteUrl || 'none'}, Twitter=${data.twitterUrl || 'none'}`);
 
-  const hasScreenshot = !!(data.websiteScreenshot || data.twitterScreenshot);
+  const hasScreenshot = !!data.websiteScreenshot;
   const prompt = buildUnifiedPrompt(data, hasScreenshot);
   
-  // Build content parts — text first, then images with media_resolution medium (speed + vision)
+  // Build content parts — text first, then website screenshot only
   const contentParts: any[] = [{ text: prompt }];
   
   if (data.websiteScreenshot) {
@@ -315,17 +339,6 @@ export async function runUnifiedAnalysis(
       )
     );
   }
-  
-  if (data.twitterScreenshot) {
-    console.log("[Unified Analyzer] 🐦 Including TWITTER screenshot (media_resolution: medium)");
-    contentParts.push(
-      createPartFromBase64(
-        data.twitterScreenshot.base64,
-        data.twitterScreenshot.mimeType,
-        PartMediaResolutionLevel.MEDIA_RESOLUTION_MEDIUM
-      )
-    );
-  }
 
   try {
     console.log("[Unified Analyzer] 🔍 Calling Gemini (thinking: medium, includeThoughts) + URL Context + Google Search...");
@@ -334,6 +347,7 @@ export async function runUnifiedAnalysis(
       model: "gemini-3-flash-preview",
       contents: [{ role: "user", parts: contentParts }],
       config: {
+        temperature: 0,
         tools: [
           { urlContext: {} },
           { googleSearch: {} },
@@ -372,10 +386,13 @@ export async function runUnifiedAnalysis(
     const result = parseUnifiedResponse(mainText);
     if (result) {
       result.thoughtSummary = thoughtSummary || undefined;
+      if (!hasScreenshot) {
+        result.visualAnalysis = "Visual security check failed: screenshot capture timed out. Analysis is based on text metadata only.";
+      }
       console.log(`[Unified Analyzer] 🎯 Verdict: ${result.verdict} (Trust: ${result.trustScore})`);
       console.log(`[Unified Analyzer] 👤 Profile: ${result.criminalProfile}`);
     }
-    
+
     return result;
   } catch (error) {
     console.error("[Unified Analyzer] ❌ Analysis failed:", error);
