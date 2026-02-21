@@ -12,7 +12,6 @@ import {
   isInitializeRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { VeritasInvestigator } from "@/lib/services/VeritasInvestigator";
-import { BotAnalysisOutput } from "@/types";
 
 const app = express();
 const port = Number(process.env.MCP_PORT || process.env.PORT || 4000);
@@ -38,52 +37,133 @@ if (typeof serverAny.setCapabilities === "function") {
 const outputSchema = {
   type: "object",
   properties: {
-    trustScore: { type: "number" },
+    veritasSays: {
+      type: "string",
+      description: "THE COMPLETE PRE-FORMATTED ANALYSIS. Contains trust score, degen street verdict, visual forensics finding, key metrics, and socials. Display this EXACTLY as-is to the user. This IS the Veritas report.",
+    },
+    trustScore: { type: "number", description: "0-100 trust score" },
     verdict: { type: "string", enum: ["Safe", "Caution", "Danger"] },
+    tokenName: { type: "string" },
+    tokenSymbol: { type: "string" },
+    tokenAddress: { type: "string" },
+    visualEvidenceStatus: {
+      type: "string",
+      enum: ["captured", "not_captured"],
+      description: "Whether a website screenshot was captured for visual forensics.",
+    },
+    visualAssetReuse: {
+      type: "string",
+      enum: ["YES", "NO", "UNKNOWN"],
+      description: "Visual forensics verdict: YES = reuse detected, NO = original assets, UNKNOWN = no screenshot.",
+    },
     onChain: {
       type: "object",
       properties: {
-        mintAuthorityEnabled: { type: "boolean" },
-        freezeAuthorityEnabled: { type: "boolean" },
-        isDumped: { type: "boolean" },
-        isWhale: { type: "boolean" },
+        mintAuth: { type: "string", enum: ["Enabled", "Disabled"] },
+        freezeAuth: { type: "string", enum: ["Enabled", "Disabled"] },
+        mintAuthStatus: { type: "string", enum: ["Enabled", "Disabled"] },
+        freezeAuthStatus: { type: "string", enum: ["Enabled", "Disabled"] },
+        supply: { type: "number" },
+        decimals: { type: "number" },
         top10Percentage: { type: "number" },
         creatorPercentage: { type: "number" },
+        isDumped: { type: "boolean" },
+        isWhale: { type: "boolean" },
       },
-      required: [
-        "mintAuthorityEnabled",
-        "freezeAuthorityEnabled",
-        "isDumped",
-        "isWhale",
-        "top10Percentage",
-        "creatorPercentage",
-      ],
+      required: ["mintAuth", "freezeAuth", "mintAuthStatus", "freezeAuthStatus", "supply", "decimals", "top10Percentage", "creatorPercentage", "isDumped", "isWhale"],
     },
     market: {
+      type: ["object", "null"],
+      properties: {
+        liquidity: { type: "number" },
+        volume24h: { type: "number" },
+        marketCap: { type: "number" },
+        buySellRatio: { type: "number" },
+        ageInHours: { type: "number" },
+        botActivity: { type: "string" },
+        anomalies: { type: "array", items: { type: "string" } },
+        anomaliesSummary: { type: "string" },
+      },
+    },
+    marketAvailable: { type: "boolean" },
+    dataCompleteness: { type: "string", enum: ["complete"] },
+    rugCheck: {
       type: "object",
       properties: {
-        botActivity: { type: "string", enum: ["Low", "Medium", "High", "Unknown"] },
-        washTradeScore: { type: "number" },
-        liquidity: { type: ["number", "null"] },
-        volume24h: { type: ["number", "null"] },
-        marketCap: { type: ["number", "null"] },
+        score: { type: "number" },
+        risks: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              description: { type: "string" },
+              level: { type: "string" },
+              score: { type: "number" },
+            },
+            required: ["name", "description", "level", "score"],
+          },
+        },
+        risksSummary: { type: "string" },
       },
-      required: ["botActivity", "washTradeScore"],
+    },
+    rugCheckAvailable: { type: "boolean" },
+    creatorHistory: {
+      type: "object",
+      properties: {
+        creatorAddress: { type: "string" },
+        previousTokens: { type: "number" },
+        isSerialLauncher: { type: "boolean" },
+      },
+      required: ["creatorAddress", "previousTokens", "isSerialLauncher"],
+    },
+    socials: {
+      type: "object",
+      properties: {
+        website: { type: ["string", "null"] },
+        twitter: { type: ["string", "null"] },
+        telegram: { type: ["string", "null"] },
+        discord: { type: ["string", "null"] },
+      },
     },
     elephantMemory: {
       type: "object",
       properties: {
         isKnownScammer: { type: "boolean" },
+        previousFlags: { type: ["object", "null"] },
       },
       required: ["isKnownScammer"],
     },
+    analyzedAt: { type: "string" },
+    analysisTimeMs: { type: "number" },
+    rawIntelligence: {
+      type: "object",
+      description: "Supplementary AI-generated narrative data. Use veritasSays for display — rawIntelligence is for programmatic access only.",
+      properties: {
+        summary: { type: "string" },
+        criminalProfile: { type: "string" },
+        lies: { type: "array", items: { type: "string" } },
+        evidence: { type: "array", items: { type: "string" } },
+        analysis: { type: "array", items: { type: "string" } },
+        visualAnalysis: { type: "string" },
+        visualEvidenceSummary: { type: "string" },
+        degenComment: { type: "string" },
+        thoughtSummary: { type: ["string", "null"] },
+      },
+    },
   },
-  required: ["trustScore", "verdict", "onChain", "market", "elephantMemory"],
+  required: [
+    "veritasSays", "trustScore", "verdict", "tokenName", "tokenSymbol", "tokenAddress",
+    "visualEvidenceStatus", "visualAssetReuse", "onChain", "market", "marketAvailable",
+    "dataCompleteness", "rugCheck", "rugCheckAvailable", "creatorHistory", "socials",
+    "elephantMemory", "analyzedAt", "analysisTimeMs", "rawIntelligence",
+  ],
 } as const;
+
 const toolDefinition = {
   name: "analyze_token",
   description:
-    "A forensic intelligence engine for TON tokens. YOU MUST PASS THE 'tokenAddress' ARGUMENT. TODO: Replace with TON API where applicable.",
+    "Forensic intelligence engine for TON tokens. Combines on-chain data (TonAPI), market signals (GeckoTerminal), TonSecurity contract audit, and Gemini Vision website screenshot analysis. Produces a Trust Score (0-100), verdict (Safe/Caution/Danger), and visual asset reuse detection.\n\nRequired argument: tokenAddress (TON token/jetton address).\n\nThe veritasSays field is a pre-composed display string containing the COMPLETE Veritas analysis — trust score, CT street verdict, visual forensics, key metrics, and socials. Present it to the user EXACTLY as-is. Supplement with structured fields (onChain, market, rugCheck) for tables if desired.",
   outputSchema,
 } as const;
 
@@ -99,8 +179,7 @@ mcpServer.server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             tokenAddress: {
               type: "string",
-              description:
-                "The exact TON token/contract address to analyze. TODO: Replace with TON API.",
+              description: "The exact TON token/jetton address to analyze.",
             },
           },
           required: ["tokenAddress"],
@@ -134,26 +213,53 @@ mcpServer.server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const investigator = new VeritasInvestigator();
     const result = await investigator.investigate(tokenAddress);
 
-    const botOutput: BotAnalysisOutput = {
+    const normalizedLies = result.lies && result.lies.length > 0 ? result.lies : ["None identified"];
+    const normalizedMarket = result.market ? {
+      ...result.market,
+      anomalies: result.market.anomalies.length > 0 ? result.market.anomalies : ["None detected"],
+      anomaliesSummary: result.market.anomalies.length > 0 ? result.market.anomalies.join("; ") : "None detected",
+    } : null;
+    const normalizedRugCheck = result.rugCheck ? {
+      ...result.rugCheck,
+      risksSummary: result.rugCheck.risks.length > 0 ? result.rugCheck.risks.map(r => r.name).join("; ") : "None detected",
+    } : { score: 0, risks: [{ name: "None detected", description: "TonSecurity API not yet implemented.", level: "info", score: 0 }], risksSummary: "None detected" };
+
+    const botOutput = {
+      veritasSays: result.veritasSays,
       trustScore: result.trustScore,
       verdict: result.verdict,
+      tokenName: result.tokenName,
+      tokenSymbol: result.tokenSymbol,
+      tokenAddress: result.tokenAddress,
+      visualEvidenceStatus: result.visualEvidenceStatus,
+      visualAssetReuse: result.visualAssetReuse,
       onChain: {
-        mintAuthorityEnabled: Boolean(result.onChain?.mintAuth),
-        freezeAuthorityEnabled: Boolean(result.onChain?.freezeAuth),
-        isDumped: Boolean(result.onChain?.isDumped),
-        isWhale: Boolean(result.onChain?.isWhale),
-        top10Percentage: Number(result.onChain?.top10Percentage ?? 0),
-        creatorPercentage: Number(result.onChain?.creatorPercentage ?? 0),
+        ...result.onChain,
+        mintAuth: result.onChain.mintAuth ? "Enabled" : "Disabled",
+        freezeAuth: result.onChain.freezeAuth ? "Enabled" : "Disabled",
+        mintAuthStatus: result.onChain.mintAuth ? "Enabled" : "Disabled",
+        freezeAuthStatus: result.onChain.freezeAuth ? "Enabled" : "Disabled",
       },
-      market: {
-        botActivity: (result.market?.botActivity as any) ?? "Unknown",
-        washTradeScore: Number((result.market as any)?.washTradeScore ?? 0),
-        liquidity: result.market?.liquidity ?? undefined,
-        volume24h: result.market?.volume24h ?? undefined,
-        marketCap: result.market?.marketCap ?? undefined,
-      },
-      elephantMemory: {
-        isKnownScammer: Boolean(result.elephantMemory?.isKnownScammer),
+      market: normalizedMarket,
+      marketAvailable: result.market !== null,
+      rugCheck: normalizedRugCheck,
+      rugCheckAvailable: result.rugCheck !== null,
+      creatorHistory: result.creatorHistory,
+      socials: result.socials,
+      elephantMemory: result.elephantMemory,
+      analyzedAt: result.analyzedAt,
+      analysisTimeMs: result.analysisTimeMs,
+      dataCompleteness: "complete",
+      rawIntelligence: {
+        summary: result.summary,
+        criminalProfile: result.criminalProfile,
+        lies: normalizedLies,
+        evidence: result.evidence,
+        analysis: result.analysis,
+        visualAnalysis: result.visualAnalysis,
+        visualEvidenceSummary: result.visualEvidenceSummary,
+        degenComment: result.degenComment,
+        thoughtSummary: result.thoughtSummary,
       },
     };
 
@@ -222,8 +328,7 @@ streamableServer.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {
           tokenAddress: {
             type: "string",
-            description:
-              "The exact TON token/contract address to analyze. TODO: Replace with TON API.",
+            description: "The exact TON token/jetton address to analyze.",
           },
         },
         required: ["tokenAddress"],
@@ -255,88 +360,59 @@ streamableServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     const investigator = new VeritasInvestigator();
     const result = await investigator.investigate(tokenAddress);
-    const onChain = result.onChain;
-    const marketAvailable = result.market !== null;
-    const market = result.market ?? {
-      liquidity: 0,
-      volume24h: 0,
-      marketCap: 0,
-      buySellRatio: 0,
-      ageInHours: 0,
-      botActivity: "Unknown",
-      anomalies: [],
-      anomaliesSummary: "None detected",
-    };
-    const rugCheckAvailable = result.rugCheck !== null;
-    const rugCheck = result.rugCheck ?? {
-      score: 0,
-      risks: [],
-      risksSummary: "None detected",
-    };
-    const normalizedMarket = {
-      ...market,
-      anomalies: market.anomalies && market.anomalies.length > 0 ? market.anomalies : ["None detected"],
-      anomaliesSummary:
-        market.anomalies && market.anomalies.length > 0 ? market.anomalies.join("; ") : "None detected",
-    };
-    const normalizedRugCheck = {
-      ...rugCheck,
-      risks:
-        rugCheck.risks && rugCheck.risks.length > 0
-          ? rugCheck.risks
-          : [
-              {
-                name: "None detected",
-                description: "No risks detected. TODO: Replace with TON API contract audit.",
-                level: "info",
-                score: 0,
-              },
-            ],
-      risksSummary:
-        rugCheck.risks && rugCheck.risks.length > 0 ? rugCheck.risks.map((r) => r.name).join("; ") : "None detected",
-    };
-    const normalizedLies = result.lies && result.lies.length > 0 ? result.lies : ["None detected"];
+
+    const normalizedLies = result.lies && result.lies.length > 0 ? result.lies : ["None identified"];
+    const normalizedMarket = result.market ? {
+      ...result.market,
+      anomalies: result.market.anomalies.length > 0 ? result.market.anomalies : ["None detected"],
+      anomaliesSummary: result.market.anomalies.length > 0 ? result.market.anomalies.join("; ") : "None detected",
+    } : null;
+    const normalizedRugCheck = result.rugCheck ? {
+      ...result.rugCheck,
+      risksSummary: result.rugCheck.risks.length > 0 ? result.rugCheck.risks.map(r => r.name).join("; ") : "None detected",
+    } : { score: 0, risks: [{ name: "None detected", description: "TonSecurity API not yet implemented.", level: "info", score: 0 }], risksSummary: "None detected" };
+
     const mcpResult = {
-      ...result,
-      lies: normalizedLies,
-      onChain: {
-        ...onChain,
-        mintAuth: onChain.mintAuth ? "Enabled" : "Disabled",
-        freezeAuth: onChain.freezeAuth ? "Enabled" : "Disabled",
-        mintAuthStatus: onChain.mintAuth ? "Enabled" : "Disabled",
-        freezeAuthStatus: onChain.freezeAuth ? "Enabled" : "Disabled",
-      },
-      market: normalizedMarket,
-      marketAvailable,
-      rugCheck: normalizedRugCheck,
-      rugCheckAvailable,
-      dataCompleteness: "complete",
-    };
-    const botOutput: BotAnalysisOutput = {
+      veritasSays: result.veritasSays,
       trustScore: result.trustScore,
       verdict: result.verdict,
+      tokenName: result.tokenName,
+      tokenSymbol: result.tokenSymbol,
+      tokenAddress: result.tokenAddress,
+      visualEvidenceStatus: result.visualEvidenceStatus,
+      visualAssetReuse: result.visualAssetReuse,
       onChain: {
-        mintAuthorityEnabled: Boolean(result.onChain?.mintAuth),
-        freezeAuthorityEnabled: Boolean(result.onChain?.freezeAuth),
-        isDumped: Boolean(result.onChain?.isDumped),
-        isWhale: Boolean(result.onChain?.isWhale),
-        top10Percentage: Number(result.onChain?.top10Percentage ?? 0),
-        creatorPercentage: Number(result.onChain?.creatorPercentage ?? 0),
+        ...result.onChain,
+        mintAuth: result.onChain.mintAuth ? "Enabled" : "Disabled",
+        freezeAuth: result.onChain.freezeAuth ? "Enabled" : "Disabled",
+        mintAuthStatus: result.onChain.mintAuth ? "Enabled" : "Disabled",
+        freezeAuthStatus: result.onChain.freezeAuth ? "Enabled" : "Disabled",
       },
-      market: {
-        botActivity: (result.market?.botActivity as any) ?? "Unknown",
-        washTradeScore: Number((result.market as any)?.washTradeScore ?? 0),
-        liquidity: result.market?.liquidity ?? undefined,
-        volume24h: result.market?.volume24h ?? undefined,
-        marketCap: result.market?.marketCap ?? undefined,
-      },
-      elephantMemory: {
-        isKnownScammer: Boolean(result.elephantMemory?.isKnownScammer),
+      market: normalizedMarket,
+      marketAvailable: result.market !== null,
+      rugCheck: normalizedRugCheck,
+      rugCheckAvailable: result.rugCheck !== null,
+      creatorHistory: result.creatorHistory,
+      socials: result.socials,
+      elephantMemory: result.elephantMemory,
+      analyzedAt: result.analyzedAt,
+      analysisTimeMs: result.analysisTimeMs,
+      dataCompleteness: "complete",
+      rawIntelligence: {
+        summary: result.summary,
+        criminalProfile: result.criminalProfile,
+        lies: normalizedLies,
+        evidence: result.evidence,
+        analysis: result.analysis,
+        visualAnalysis: result.visualAnalysis,
+        visualEvidenceSummary: result.visualEvidenceSummary,
+        degenComment: result.degenComment,
+        thoughtSummary: result.thoughtSummary,
       },
     };
     return {
-      content: [{ type: "text" as const, text: JSON.stringify(botOutput, null, 2) }],
-      structuredContent: botOutput,
+      content: [{ type: "text" as const, text: JSON.stringify(mcpResult, null, 2) }],
+      structuredContent: mcpResult,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

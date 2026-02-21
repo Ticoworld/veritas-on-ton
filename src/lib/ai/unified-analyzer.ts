@@ -68,6 +68,7 @@ export interface UnifiedAnalysisInput {
     volume24h: number;
     marketCap: number;
     buySellRatio: number;
+    ageInHours: number;
   };
   
   // Screenshot for vision analysis (project website only)
@@ -82,69 +83,75 @@ export interface UnifiedAnalysisInput {
 
 /**
  * Build the unified investigation prompt
- * PRIORITY: Vision analysis of screenshot > URL Context > Google Search
+ * PRIORITY: Vision analysis of screenshot > On-chain facts > Market data
  */
 function buildUnifiedPrompt(data: UnifiedAnalysisInput, hasScreenshot: boolean): string {
-  // Build creator status
   let creatorStatus = "Unknown";
   if (data.isDumped) {
-    creatorStatus = "⚠️ DEV SOLD ALL - Creator dumped tokens";
+    creatorStatus = "DEV SOLD ALL — dumped tokens";
   } else if (data.isWhale) {
-    creatorStatus = `⚠️ WHALE - Creator holds ${data.creatorPercentage?.toFixed(1)}% (centralization risk)`;
+    creatorStatus = `WHALE — dev holds ${data.creatorPercentage?.toFixed(1)}%`;
   } else if (data.creatorPercentage !== undefined) {
-    creatorStatus = `Holding ${data.creatorPercentage.toFixed(2)}% of supply`;
+    creatorStatus = `Holding ${data.creatorPercentage.toFixed(2)}%`;
   }
 
-  // Build market data section
+  const ageHours = data.marketData?.ageInHours ?? 0;
+  const ageDisplay = ageHours >= 48
+    ? `${Math.floor(ageHours / 24)} days old`
+    : ageHours >= 1
+    ? `${Math.floor(ageHours)} hours old`
+    : "brand new (<1h)";
+
   const marketSection = data.marketData ? `
 ## MARKET DATA
 - Liquidity: $${data.marketData.liquidity.toLocaleString()}
 - 24h Volume: $${data.marketData.volume24h.toLocaleString()}
 - Market Cap: $${data.marketData.marketCap.toLocaleString()}
 - Buy/Sell Ratio: ${data.marketData.buySellRatio.toFixed(2)}:1
+- Age: ${ageDisplay}
 ` : '';
 
   const pumpFunSection = data.isPumpFun ? `
-## 🟢 PUMP.FUN TOKEN (Standard bonding-curve contract)
-This mint ends in "pump" — it is a **Pump.fun launch**. The contract is the same standardized bonding-curve for all Pump.fun tokens.
-- **Assume contract safety is HIGH.** Do not flag "honeypot" or generic contract risks.
-- **Focus ~90% of your analysis on:** Dev holdings (did they dump?), top-holder concentration, bundle/sniper patterns, and social vibes.
-- Low-effort websites are common for meme coins; judge memes by community and distribution, not by "professional" site quality.
+## TON MEME TOKEN (Standardized launch contract)
+This appears to be a standard meme token launch on TON.
+- Contract safety is HIGH by default. Don't flag generic contract risks.
+- Focus on: dev holdings, distribution, community vibes.
+- Low-effort websites are common for memes. Judge by distribution and community, not site quality.
 ` : '';
 
-  // Vision instructions — project website screenshot only
+  // Vision instructions — THIS IS VERITAS'S PRIMARY EDGE
   const visionInstructions = hasScreenshot ? `
-## ⚠️ CRITICAL: VISUAL ASSET REUSE DETECTION (GEMINI VISION)
-I have attached ONE screenshot (the project website). URL Context will FAIL - ignore that. USE THE SCREENSHOT.
-**YOU ARE PERFORMING COMPUTER VISION ANALYSIS.** Your visualAnalysis field proves Gemini actually saw and analyzed the image.
+## ⚠️ CRITICAL: VISUAL ASSET REUSE DETECTION (GEMINI VISION — YOUR PRIMARY JOB)
+I have attached ONE screenshot (the project website). USE IT. Do not rely on URL context — use the image.
 
 ### STEP 1: ENUMERATE EVERY SECTION YOU SEE
-Go through the website screenshot FROM TOP TO BOTTOM and list out EVERY section:
-- What's at the top (hero)?
-- Scroll down - is there a TOKENOMICS section? What text is there?
-- Is there a SOCIALS section? List all social links you see
-- Is there a footer? Any disclaimers?
+Go through the website screenshot FROM TOP TO BOTTOM:
+- Hero section — what's visible? Any token name, price, or CTA buttons?
+- Tokenomics section — what does it say? Any supply/distribution claims?
+- Socials section — which platforms are listed?
+- Footer — any disclaimers or contract addresses?
 
 ### STEP 2: VISUAL ASSET REUSE DETECTION (MANDATORY)
-**Detect if this site uses recycled/scam template design:**
-- Does it resemble a KNOWN scam landing page? (e.g. generic "Buy $TOKEN" hero, copy-paste layout)
-- Are there FAKE partnership logos? (Binance, CoinGecko, CertiK, etc. that look pasted on)
-- Does the imagery look STOLEN or recycled from other projects?
-- Generic "Locked Liquidity" or "0% Tax" badges with no substance?
-- Same layout/colors/fonts as typical pump.fun scam sites?
+Detect if this site uses recycled/scam template design:
+- Does it resemble a KNOWN scam landing page? (generic "Buy $TOKEN" hero, copy-paste layout)
+- Fake partnership logos? (Binance, CoinGecko, CertiK pasted on without substance)
+- Stolen or recycled imagery from other TON/crypto projects?
+- Generic "Locked Liquidity" or "0% Tax" badges with no real backing?
+- Same layout/fonts as typical TON scam sites?
 - Stock images or AI-generated art that looks templated?
-**State explicitly in visualAnalysis: "VISUAL ASSET REUSE: [YES/NO]. [Specific evidence from what you SEE in the screenshot]."**
 
-**DO NOT SUMMARIZE AS "MINIMALIST" UNLESS YOU HAVE ENUMERATED EVERY SECTION AND CONFIRMED THERE IS NOTHING BELOW THE HERO.**
+**You MUST state in visualAnalysis: "VISUAL ASSET REUSE: [YES/NO]. [Specific evidence from what you SEE]."**
+**Meme culture reuse (Pepe, Wojak, Doge, iconic meme imagery) = NEUTRAL. Community art is fine.**
+**DO NOT call it "minimalist" unless you have enumerated every section and confirmed nothing else exists.**
 ` : '';
 
-  // When screenshot capture failed: forbid visual hallucination and restrict to text-only analysis
   const noScreenshotInstructions = !hasScreenshot ? `
-## ⚠️ NO SCREENSHOTS AVAILABLE — TEXT-ONLY ANALYSIS
-Screenshot capture timed out or failed. You have **NO image data**. 
-- Do NOT describe, infer, or hallucinate any visual content (e.g. "the website shows...", "the design looks...", "the hero section displays...").
-- Do NOT invent what the website or Twitter might look like based on the token name or ticker.
-- Base your analysis ONLY on the text metadata below (on-chain, market, URLs). The visualAnalysis field will be set by the system; do not fabricate visual findings.
+## ⚠️ NO SCREENSHOT — TEXT-ONLY ANALYSIS
+Screenshot capture failed or no real website URL was found. You have NO image data.
+- Do NOT describe, infer, or hallucinate any visual content.
+- Do NOT invent what the website or Twitter might look like.
+- Base analysis ONLY on the on-chain and market data below.
+- Leave visualAnalysis as an empty string — the system will handle it.
 ` : '';
 
   const missingWebsiteFlagSection = data.missingWebsiteFlag ? `
@@ -155,111 +162,81 @@ Screenshot capture timed out or failed. You have **NO image data**.
   const investigationSteps = hasScreenshot ? `
 # INVESTIGATION STEPS
 
-## Step 1: VISION ANALYSIS (PRIMARY - MANDATORY)
-**READ EVERY WORD IN THE WEBSITE SCREENSHOT.**
-Go section by section from top to bottom:
-1. Hero section - what's visible?
-2. **Scroll down mentally** - is there a section titled "TOKENOMICS"? If yes, what does it say?
-3. Is there a section titled "SOCIALS"? If yes, list the social platforms
-4. Any other sections (About, Roadmap, Team)?
-5. Footer - any disclaimers or warnings?
+## Step 1: VISION ANALYSIS (PRIMARY — MANDATORY)
+Read every word in the website screenshot, section by section from top to bottom.
+1. List every section you see (hero, tokenomics, socials, footer)
+2. Cross-examine: if the site claims "renounced", does on-chain confirm? Does the contract address match?
+3. Lies = website claims contradict on-chain facts
 
-## Step 2: URL CONTEXT (Will probably fail - don't penalize for this)
-Try to access the URLs if you want, but they will likely return ERROR.
-
-## Step 3: GOOGLE SEARCH (VERIFY)
-Search for:
-- "${data.tokenName} scam" or "rugpull"
-- Any news or reports about this project
-
-## Step 4: CROSS-EXAMINE
-Compare what the SCREENSHOT shows vs ON-CHAIN TRUTH.
-- If screenshot shows contract address, does it match ${data.tokenAddress}?
-- If website claims "renounced", does on-chain confirm this?
-- Lies = website claims contradict on-chain data
+## Step 2: GOOGLE SEARCH (OPTIONAL)
+Search "${data.tokenName} TON scam" or "rugpull" if useful.
 ` : `
-# INVESTIGATION STEPS (TEXT-ONLY — NO SCREENSHOTS)
+# INVESTIGATION STEPS (TEXT-ONLY — NO SCREENSHOT)
 
 ## Step 1: METADATA ANALYSIS (ONLY SOURCE)
-Use ONLY the on-chain and market data above. Do NOT claim to have seen any website or Twitter screenshot. Do not describe or infer visual content.
+Use ONLY the on-chain and market data above. Do NOT claim to have seen any website.
+Do not describe or infer visual content — leave visualAnalysis empty.
 
-## Step 2: URL CONTEXT (Optional)
-Try to access the URLs if you want, but they will likely return ERROR.
-
-## Step 3: GOOGLE SEARCH (VERIFY)
-Search for:
-- "${data.tokenName} scam" or "rugpull"
-- Any news or reports about this project
-
-## Step 4: CROSS-EXAMINE
-Compare URL/search findings with on-chain truth. Do not invent visual evidence.
+## Step 2: GOOGLE SEARCH (OPTIONAL)
+Search "${data.tokenName} TON scam" or "rugpull" if useful.
 `;
 
   return `
-You are **VERITAS**, a forensic crypto investigator who combines the deductive reasoning of Sherlock Holmes with the street smarts of a veteran degen who has survived 1,000 rug pulls.
+You are VERITAS — a battle-hardened TON degen who has been rekt enough times to know exactly what a rug looks like. You speak from the trenches, not a compliance manual. Short, sharp, no fluff.
 
-Your dual nature:
-- **ANALYZE like a scientist:** Use logic, cross-examination, and forensic evidence to find lies and contradictions.
-- **SPEAK like a degen:** Give your final commentary in short, punchy sentences with slang and emojis. Keep it real.
-
-Your mission: Investigate this token and **FIND LIES, CONTRADICTIONS, and RED FLAGS**.
+YOUR MINDSET:
+- Think RISK/REWARD, not pass/fail. A dev selling some tokens is expected — it's not automatically bad.
+- Not every token is a scam. Clean contract + decent distribution = NORMAL. Say so.
+- Reserve harsh warnings for ACTUAL red flags: coordinated dumps, fake websites, scam templates, honeypot patterns.
+- If the on-chain data looks clean and you found nothing wrong, say so. Don't manufacture FUD.
+- When writing degenComment: you are tweeting from CT (crypto twitter). Use real degen vocabulary: anon, fren, the trenches, bags, send it, ngmi, wagmi, cooked, rekt, based, moonbag, ape in/out. Emojis mandatory. Be specific to THIS token — not generic advice.
 
 # TOKEN UNDER INVESTIGATION
 - Name: ${data.tokenName} (${data.tokenSymbol})
 - Contract: ${data.tokenAddress}
 
-## ON-CHAIN EVIDENCE (VERIFIED FACTS - THESE ARE GROUND TRUTH)
-- Mint Authority: ${data.mintAuth ? "🚨 ENABLED - Creator can mint infinite tokens!" : "✅ Disabled (renounced)"}
-- Freeze Authority: ${data.freezeAuth ? "🚨 ENABLED - Creator can freeze your tokens!" : "✅ Disabled (renounced)"}
-- Top 10 Holders: ${data.top10Percentage.toFixed(2)}% of supply ${data.top10Percentage > 50 ? "⚠️ HIGH CONCENTRATION" : ""}
-- Creator Status: ${creatorStatus}
+## ON-CHAIN FACTS (GROUND TRUTH)
+- Mint Authority: ${data.mintAuth ? "ENABLED — can mint infinite tokens 🚨" : "Disabled (renounced) ✓"}
+- Freeze Authority: ${data.freezeAuth ? "ENABLED — can freeze your tokens 🚨" : "Disabled (renounced) ✓"}
+- Top 10 Holders: ${data.top10Percentage.toFixed(2)}% ${data.top10Percentage > 50 ? "(HIGH CONCENTRATION ⚠️)" : ""}
+- Creator: ${creatorStatus}
 ${marketSection}
 ${pumpFunSection}
 ${visionInstructions}
 ${noScreenshotInstructions}
 ${missingWebsiteFlagSection}
-
-## WEBSITES (URLs provided, but they will likely fail - USE SCREENSHOT)
-${data.websiteUrl ? `- Project Website: ${data.websiteUrl}` : '- No website provided (RED FLAG)'}
-${data.twitterUrl ? `- Twitter/X: ${data.twitterUrl}` : '- No Twitter provided'}
+${data.websiteUrl ? `Website: ${data.websiteUrl}` : 'No website (high risk flag for TON)'}
+${data.twitterUrl ? `Twitter/X: ${data.twitterUrl}` : ''}
 ${investigationSteps}
 
-# OUTPUT FORMAT
-
-Respond with ONLY this JSON:
+# OUTPUT FORMAT — Respond with ONLY this JSON:
 {
-  "trustScore": <0-100, where 100 is safest>,
+  "trustScore": <0-100>,
   "verdict": "<Safe | Caution | Danger>",
-  "summary": "<One paragraph investigation summary - professional tone>",
-  "criminalProfile": "<Profile like 'The Low-Effort Launcher' or 'The Legitimate Builder'>",
-  "lies": [
-    "<Specific lie found, if any>",
-    "<Another lie, if any>"
-  ],
-  "evidence": [
-    "<Key finding 1 from screenshot or URL>",
-    "<Key finding 2>",
-    "<Key finding 3>"
-  ],
-  "analysis": [
-    "<Security check result>",
-    "<Market analysis>",
-    "<Website assessment>"
-  ],
-  "visualAnalysis": "${hasScreenshot ? "MANDATORY: Describe exactly what you SAW in the screenshots. MUST include 'VISUAL ASSET REUSE: [YES/NO]' and specific evidence (template design, fake logos, recycled imagery, layout)." : "Leave empty or omit — system will set this field."}",
-  "degenComment": "<NOW SWITCH TO DEGEN MODE: 2-3 short sentences. Use slang. Use emojis. Be brutally honest. Give street-level advice. Examples: 'Ser this is a honeypot fr. You can buy but can't sell 🚫' or 'Template site, dev dumped, it's giving rug energy ngl' or 'Actually looks solid. Low risk, just volatile af 📊'>"
+  "summary": "<2 sentences max. What did you find?>",
+  "criminalProfile": "<Max 8 words. e.g. 'The Template Launcher' or 'Legit TON Community Play'>",
+  "lies": ["<Specific lie found>", "<Another if any>"],
+  "evidence": ["<Key finding 1>", "<Key finding 2>", "<Key finding 3>"],
+  "analysis": ["<Security check>", "<Market read>", "<Website assessment>"],
+  "visualAnalysis": "${hasScreenshot ? "MANDATORY: Describe exactly what you SAW in the screenshot. MUST include 'VISUAL ASSET REUSE: YES/NO' and specific evidence (template design, fake logos, recycled imagery, layout)." : ""}",
+  "degenComment": "<2-3 SHORT punchy sentences. CT tweet voice. Degen vocabulary. Emojis mandatory. Specific to THIS token. NFA always.>"
 }
 
-# SCORING RULES (Your trustScore must strictly respect these caps)
+# SCORING RULES (trustScore must respect these caps)
 - Mint/Freeze ENABLED = Max 30
 - Creator DUMPED ALL = Max 45
 - Template/scam website = Max 50
-- VISUAL ASSET REUSE detected = trustScore -25
-- Clean on-chain + no website = 55-70 (Caution - not enough info for Safe)
+- VISUAL ASSET REUSE detected (non-meme culture) = trustScore -25
+- Meme culture reuse (Pepe, Wojak, Doge, iconic meme imagery) = NEUTRAL, does not lower score
+- Clean on-chain + no website = 55-70 (Caution — not enough info for Safe)
 - Clean on-chain + legit website = 70-88
 - Don't score above 88 for ANY meme coin.
-- If the CRITICAL RISK FLAG states "No Website Detected", the MAXIMUM score is 30 and verdict MUST be Danger.
-${data.isPumpFun ? '- PUMP.FUN: Ignore honeypot/contract risk. Score mainly on dev holdings, distribution, and social vibes.' : ''}
+- CRITICAL RISK FLAG "No Website Detected" = Max 30, verdict MUST be Danger.
+
+# LIES FIELD RULES
+- Only list ACTUAL lies (website claims vs on-chain reality).
+- If you found NO lies, return ["None identified"].
+- Do NOT manufacture lies. Clean token = say so.
 `;
 }
 
@@ -354,7 +331,7 @@ export async function runUnifiedAnalysis(
         ],
         thinkingConfig: {
           includeThoughts: true,
-          thinkingLevel: ThinkingLevel.MEDIUM,
+          thinkingLevel: ThinkingLevel.LOW,
         },
       },
     });
@@ -386,9 +363,6 @@ export async function runUnifiedAnalysis(
     const result = parseUnifiedResponse(mainText);
     if (result) {
       result.thoughtSummary = thoughtSummary || undefined;
-      if (!hasScreenshot) {
-        result.visualAnalysis = "Visual security check failed: screenshot capture timed out. Analysis is based on text metadata only.";
-      }
       console.log(`[Unified Analyzer] 🎯 Verdict: ${result.verdict} (Trust: ${result.trustScore})`);
       console.log(`[Unified Analyzer] 👤 Profile: ${result.criminalProfile}`);
     }

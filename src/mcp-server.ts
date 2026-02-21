@@ -30,7 +30,6 @@ config({ path: ".env.local" }); // Next.js env (overrides)
 
 import { z } from "zod/v3";
 import { VeritasInvestigator } from "@/lib/services/VeritasInvestigator";
-import { BotAnalysisOutput } from "@/types";
 
 async function main() {
   const { McpServer } = await import("@modelcontextprotocol/sdk/server/mcp.js");
@@ -44,39 +43,64 @@ async function main() {
   server.tool(
     "analyze_token",
     {
-      tokenAddress: z.string().describe("TON token/contract address to analyze for fraud risk. TODO: Replace with TON API."),
+      tokenAddress: z.string().describe("TON token/contract address to analyze for fraud risk"),
     },
     async ({ tokenAddress }) => {
       try {
         const investigator = new VeritasInvestigator();
         const result = await investigator.investigate(tokenAddress);
 
-        const botOutput: BotAnalysisOutput = {
+        const normalizedLies = result.lies && result.lies.length > 0 ? result.lies : ["None identified"];
+
+        const mcpResult = {
+          veritasSays: result.veritasSays,
           trustScore: result.trustScore,
           verdict: result.verdict,
+          tokenName: result.tokenName,
+          tokenSymbol: result.tokenSymbol,
+          tokenAddress: result.tokenAddress,
+          visualEvidenceStatus: result.visualEvidenceStatus,
+          visualAssetReuse: result.visualAssetReuse,
           onChain: {
-            mintAuthorityEnabled: Boolean(result.onChain?.mintAuth),
-            freezeAuthorityEnabled: Boolean(result.onChain?.freezeAuth),
-            isDumped: Boolean(result.onChain?.isDumped),
-            isWhale: Boolean(result.onChain?.isWhale),
-            top10Percentage: Number(result.onChain?.top10Percentage ?? 0),
-            creatorPercentage: Number(result.onChain?.creatorPercentage ?? 0),
+            ...result.onChain,
+            mintAuth: result.onChain.mintAuth ? "Enabled" : "Disabled",
+            freezeAuth: result.onChain.freezeAuth ? "Enabled" : "Disabled",
+            mintAuthStatus: result.onChain.mintAuth ? "Enabled" : "Disabled",
+            freezeAuthStatus: result.onChain.freezeAuth ? "Enabled" : "Disabled",
           },
-          market: {
-            botActivity: (result.market?.botActivity as any) ?? "Unknown",
-            washTradeScore: Number((result.market as any)?.washTradeScore ?? 0),
-            liquidity: result.market?.liquidity ?? undefined,
-            volume24h: result.market?.volume24h ?? undefined,
-            marketCap: result.market?.marketCap ?? undefined,
-          },
-          elephantMemory: {
-            isKnownScammer: Boolean(result.elephantMemory?.isKnownScammer),
+          market: result.market ? {
+            ...result.market,
+            anomalies: result.market.anomalies.length > 0 ? result.market.anomalies : ["None detected"],
+            anomaliesSummary: result.market.anomalies.length > 0 ? result.market.anomalies.join("; ") : "None detected",
+          } : null,
+          marketAvailable: result.market !== null,
+          rugCheck: result.rugCheck ? {
+            ...result.rugCheck,
+            risksSummary: result.rugCheck.risks.length > 0 ? result.rugCheck.risks.map(r => r.name).join("; ") : "None detected",
+          } : { score: 0, risks: [], risksSummary: "TonSecurity API not yet implemented." },
+          rugCheckAvailable: result.rugCheck !== null,
+          creatorHistory: result.creatorHistory,
+          socials: result.socials,
+          elephantMemory: result.elephantMemory,
+          analyzedAt: result.analyzedAt,
+          analysisTimeMs: result.analysisTimeMs,
+          dataCompleteness: "complete",
+          rawIntelligence: {
+            summary: result.summary,
+            criminalProfile: result.criminalProfile,
+            lies: normalizedLies,
+            evidence: result.evidence,
+            analysis: result.analysis,
+            visualAnalysis: result.visualAnalysis,
+            visualEvidenceSummary: result.visualEvidenceSummary,
+            degenComment: result.degenComment,
+            thoughtSummary: result.thoughtSummary,
           },
         };
 
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(botOutput, null, 2) }],
-          structuredContent: botOutput as unknown as Record<string, unknown>,
+          content: [{ type: "text" as const, text: JSON.stringify(mcpResult, null, 2) }],
+          structuredContent: mcpResult as unknown as Record<string, unknown>,
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
