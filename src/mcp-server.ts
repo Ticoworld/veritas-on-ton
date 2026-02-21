@@ -63,10 +63,8 @@ async function main() {
           visualAssetReuse: result.visualAssetReuse,
           onChain: {
             ...result.onChain,
-            mintAuth: result.onChain.mintAuth ? "Enabled" : "Disabled",
-            freezeAuth: result.onChain.freezeAuth ? "Enabled" : "Disabled",
-            mintAuthStatus: result.onChain.mintAuth ? "Enabled" : "Disabled",
-            freezeAuthStatus: result.onChain.freezeAuth ? "Enabled" : "Disabled",
+            mintAuth: Boolean(result.onChain.mintAuth),
+            freezeAuth: Boolean(result.onChain.freezeAuth),
           },
           market: result.market ? {
             ...result.market,

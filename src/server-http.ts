@@ -59,10 +59,8 @@ const outputSchema = {
     onChain: {
       type: "object",
       properties: {
-        mintAuth: { type: "string", enum: ["Enabled", "Disabled"] },
-        freezeAuth: { type: "string", enum: ["Enabled", "Disabled"] },
-        mintAuthStatus: { type: "string", enum: ["Enabled", "Disabled"] },
-        freezeAuthStatus: { type: "string", enum: ["Enabled", "Disabled"] },
+        mintAuth: { type: "boolean", description: "true = mint authority enabled (creator can inflate supply)" },
+        freezeAuth: { type: "boolean", description: "true = freeze authority enabled (creator can freeze wallets)" },
         supply: { type: "number" },
         decimals: { type: "number" },
         top10Percentage: { type: "number" },
@@ -70,7 +68,7 @@ const outputSchema = {
         isDumped: { type: "boolean" },
         isWhale: { type: "boolean" },
       },
-      required: ["mintAuth", "freezeAuth", "mintAuthStatus", "freezeAuthStatus", "supply", "decimals", "top10Percentage", "creatorPercentage", "isDumped", "isWhale"],
+      required: ["mintAuth", "freezeAuth", "supply", "decimals", "top10Percentage", "creatorPercentage", "isDumped", "isWhale"],
     },
     market: {
       type: ["object", "null"],
@@ -235,10 +233,8 @@ mcpServer.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       visualAssetReuse: result.visualAssetReuse,
       onChain: {
         ...result.onChain,
-        mintAuth: result.onChain.mintAuth ? "Enabled" : "Disabled",
-        freezeAuth: result.onChain.freezeAuth ? "Enabled" : "Disabled",
-        mintAuthStatus: result.onChain.mintAuth ? "Enabled" : "Disabled",
-        freezeAuthStatus: result.onChain.freezeAuth ? "Enabled" : "Disabled",
+        mintAuth: Boolean(result.onChain.mintAuth),
+        freezeAuth: Boolean(result.onChain.freezeAuth),
       },
       market: normalizedMarket,
       marketAvailable: result.market !== null,
@@ -383,10 +379,8 @@ streamableServer.setRequestHandler(CallToolRequestSchema, async (request) => {
       visualAssetReuse: result.visualAssetReuse,
       onChain: {
         ...result.onChain,
-        mintAuth: result.onChain.mintAuth ? "Enabled" : "Disabled",
-        freezeAuth: result.onChain.freezeAuth ? "Enabled" : "Disabled",
-        mintAuthStatus: result.onChain.mintAuth ? "Enabled" : "Disabled",
-        freezeAuthStatus: result.onChain.freezeAuth ? "Enabled" : "Disabled",
+        mintAuth: Boolean(result.onChain.mintAuth),
+        freezeAuth: Boolean(result.onChain.freezeAuth),
       },
       market: normalizedMarket,
       marketAvailable: result.market !== null,
