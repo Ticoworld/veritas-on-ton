@@ -1,6 +1,6 @@
 /**
  * Veritas Type Definitions
- * TypeScript interfaces for the Pump.fun token scanner
+ * TypeScript interfaces for the token scanner
  */
 
 /**
@@ -19,14 +19,14 @@ export interface TokenData {
 }
 
 /**
- * Bonding curve status for a Pump.fun token
+ * Liquidity pool status for a token
  */
-export interface BondingCurveStatus {
+export interface LiquidityPoolStatus {
   isComplete: boolean;
   progress: number; // 0-100 percentage
-  virtualSolReserves: number;
+  virtualNativeReserves: number;
   virtualTokenReserves: number;
-  realSolReserves: number;
+  realNativeReserves: number;
   realTokenReserves: number;
 }
 
@@ -39,7 +39,7 @@ export interface CreatorWalletAnalysis {
   rugPullCount: number;
   successfulTokens: number;
   avgHoldTime: number; // in seconds
-  totalSolExtracted: number;
+  totalNativeExtracted: number;
   firstActivityDate: Date;
   riskScore: number; // 0-100, higher = more risky
 }
@@ -90,7 +90,7 @@ export interface RiskFactor {
 export interface AuditResult {
   tokenAddress: string;
   tokenData: TokenData;
-  bondingCurve: BondingCurveStatus;
+  liquidityPool: LiquidityPoolStatus;
   creatorAnalysis: CreatorWalletAnalysis;
   creatorStatus: CreatorStatus;
   socials?: TokenSocials; // Added social links

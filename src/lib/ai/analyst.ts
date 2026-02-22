@@ -414,9 +414,7 @@ export async function runDeepInvestigation(
   let twitterImage: { base64: string; mimeType: string } | null = null;
 
   if (websiteUrl) {
-    // Use fullPage=true for the website to read the footer/disclaimers
-    const fullPageUrl = `https://api.microlink.io/?url=${encodeURIComponent(websiteUrl)}&screenshot=true&meta=false&embed=screenshot.url&waitForTimeout=4000&waitUntil=networkidle0&fullPage=true`;
-    websiteImage = await fetchScreenshotAsBase64(fullPageUrl);
+    websiteImage = await fetchScreenshotAsBase64(websiteUrl, { fullPage: true });
   }
 
   // Twitter screenshots removed — no security value (same UI for all profiles)
@@ -446,7 +444,7 @@ export async function runDeepInvestigation(
      - Zoom in on the footer (Image) and read the Disclaimers.
      - CROSS-EXAMINE: Does the text claim "0% Tax" or "Locked Liquidity"? 
      - Does the text contain standard rug-pull phrases like "No expectation of profit"?
-     - Does the website look like a template (e.g., standard pump.fun template)?
+      - Does the website look like a recycled scam template?
 
   3. **Social Background Check (Twitter Image):**
      - Look at the Follower Count in the screenshot. Is it < 50? (Burner account).

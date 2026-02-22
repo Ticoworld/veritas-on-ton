@@ -15,7 +15,7 @@ import { getTokenInfo, getHolderDistribution, validateAddress } from "@/lib/bloc
 import { getTokenSocials } from "@/lib/api/dexscreener";
 import { getMarketAnalysis } from "@/lib/api/market";
 import { getCreatorHistory } from "@/lib/api/historian";
-import { fetchScreenshotAsBase64, getMicrolinkUrl } from "@/lib/api/screenshot";
+import { fetchScreenshotAsBase64 } from "@/lib/api/screenshot";
 import { fetchTonSecurity, type TonSecurityReport } from "@/lib/api/tonsecurity";
 import { runUnifiedAnalysis, type UnifiedAnalysisInput, type UnifiedAnalysisResult } from "@/lib/ai/unified-analyzer";
 import { checkKnownScammer, flagScammer, type ScammerRecord } from "@/lib/db/elephant";
@@ -224,10 +224,10 @@ export class VeritasInvestigator {
 
     const [websiteScreenshot, creatorHistory] = await Promise.all([
       isRealWebsite
-        ? fetchScreenshotAsBase64(getMicrolinkUrl(websiteUrl!.trim(), true), {
+        ? fetchScreenshotAsBase64(websiteUrl!.trim(), {
             saveToDisk: saveScreenshots,
             prefix: "website",
-            originalUrl: websiteUrl!.trim(),
+            fullPage: true,
           }).catch(() => null)
         : Promise.resolve(null),
       getCreatorHistory(creatorStatus.creatorAddress).catch(() => [] as any[]),
@@ -265,7 +265,6 @@ export class VeritasInvestigator {
         ageInHours: marketData.ageInHours,
       } : undefined,
       websiteScreenshot: websiteScreenshot || undefined,
-      isPumpFun: false,
       missingWebsiteFlag: !isRealWebsite
         ? "Flag: No Website Detected. This indicates a very high risk of a low-effort rug pull."
         : undefined,

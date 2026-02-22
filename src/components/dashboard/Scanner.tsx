@@ -35,7 +35,7 @@ export function Scanner() {
                   variant="command"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Paste TON explorer link or contract address..."
+                  placeholder="Paste token address, pair URL (DexScreener/GeckoTerminal), or explorer link..."
                   showPrompt
                   disabled={loading}
                 />

@@ -76,9 +76,6 @@ export interface UnifiedAnalysisInput {
 
   /** Injected when no website URL — critical risk flag for Gemini */
   missingWebsiteFlag?: string;
-
-  // Pump.fun context (mint ends with "pump")
-  isPumpFun?: boolean;
 }
 
 /**
@@ -109,14 +106,6 @@ function buildUnifiedPrompt(data: UnifiedAnalysisInput, hasScreenshot: boolean):
 - Market Cap: $${data.marketData.marketCap.toLocaleString()}
 - Buy/Sell Ratio: ${data.marketData.buySellRatio.toFixed(2)}:1
 - Age: ${ageDisplay}
-` : '';
-
-  const pumpFunSection = data.isPumpFun ? `
-## TON MEME TOKEN (Standardized launch contract)
-This appears to be a standard meme token launch on TON.
-- Contract safety is HIGH by default. Don't flag generic contract risks.
-- Focus on: dev holdings, distribution, community vibes.
-- Low-effort websites are common for memes. Judge by distribution and community, not site quality.
 ` : '';
 
   // Vision instructions — THIS IS VERITAS'S PRIMARY EDGE
@@ -201,7 +190,6 @@ YOUR MINDSET:
 - Top 10 Holders: ${data.top10Percentage.toFixed(2)}% ${data.top10Percentage > 50 ? "(HIGH CONCENTRATION ⚠️)" : ""}
 - Creator: ${creatorStatus}
 ${marketSection}
-${pumpFunSection}
 ${visionInstructions}
 ${noScreenshotInstructions}
 ${missingWebsiteFlagSection}

@@ -96,6 +96,10 @@ interface ScanResult {
     discord?: string;
   };
   
+  // Visual forensics
+  visualEvidenceStatus?: "captured" | "not_captured";
+  visualAssetReuse?: "YES" | "NO" | "UNKNOWN";
+
   // Metadata
   elephantMemory: {
     isKnownScammer: boolean;
@@ -429,6 +433,61 @@ export function TruthConsole() {
               enabled={!!result.onChain.freezeAuth}
             />
           </div>
+
+          {/* Visual Forensics Block */}
+          {(result.visualEvidenceStatus || result.visualAnalysis) && (
+            <div className={`bg-[#0A0A0B] rounded-sm p-4 border ${
+              result.visualEvidenceStatus === "captured"
+                ? "border-[#27272A]"
+                : "border-[#3F3F46]"
+            }`}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-[#71717A] text-lg">👁</span>
+                  <span className="text-[#71717A] text-xs font-mono uppercase tracking-wide">Visual Forensics</span>
+                </div>
+
+                {/* Screenshot status pill */}
+                <span className={`text-[10px] font-mono uppercase tracking-wide px-2 py-0.5 rounded-sm border ${
+                  result.visualEvidenceStatus === "captured"
+                    ? "text-[#22C55E] border-[#166534] bg-[#052E16]"
+                    : "text-[#71717A] border-[#3F3F46] bg-[#18181B]"
+                }`}>
+                  {result.visualEvidenceStatus === "captured" ? "Screenshot ✓" : "Screenshot ✗"}
+                </span>
+              </div>
+
+              {/* Visual Asset Reuse badge — the key forensics signal */}
+              {result.visualAssetReuse && result.visualAssetReuse !== "UNKNOWN" && (
+                <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border mb-3 ${
+                  result.visualAssetReuse === "YES"
+                    ? "bg-[#450A0A] border-[#7F1D1D] text-[#EF4444]"
+                    : "bg-[#052E16] border-[#166534] text-[#22C55E]"
+                }`}>
+                  <span className="text-sm">{result.visualAssetReuse === "YES" ? "🚨" : "✅"}</span>
+                  <span className="text-xs font-mono uppercase tracking-wide">
+                    Visual Asset Reuse: {result.visualAssetReuse}
+                  </span>
+                </div>
+              )}
+              {result.visualAssetReuse === "UNKNOWN" && (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border mb-3 bg-[#18181B] border-[#3F3F46] text-[#71717A]">
+                  <span className="text-xs font-mono uppercase tracking-wide">Visual Asset Reuse: UNKNOWN</span>
+                </div>
+              )}
+
+              {/* Full AI visual analysis reasoning trace */}
+              {result.visualAnalysis && (
+                <p className="text-[#A1A1AA] text-sm font-mono leading-relaxed whitespace-pre-wrap">
+                  {result.visualAnalysis}
+                </p>
+              )}
+
+              {!result.visualAnalysis && result.visualEvidenceStatus !== "captured" && (
+                <p className="text-[#52525B] text-xs font-mono">Screenshot capture failed — visual forensics unavailable.</p>
+              )}
+            </div>
+          )}
 
           {/* Degen Comment - Featured */}
           {result.degenComment && (

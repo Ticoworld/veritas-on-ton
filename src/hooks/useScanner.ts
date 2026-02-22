@@ -75,14 +75,35 @@ function isValidTokenAddress(address: string): boolean {
 
 /**
  * Extracts token address from various input formats.
- * TODO: Replace with TON API - add TON explorer/dex URL patterns (e.g. tonviewer, dexscreener/ton).
+ * Supports:
+ * - Raw TON addresses (EQAv1WFDxGF21Xm67...)
+ * - DexScreener pair URLs (dexscreener.com/ton/EQAv1WFDxGF21Xm67...)
+ * - GeckoTerminal URLs (geckoterminal.com/ton/pools/EQAv1WFDxGF21Xm67...)
+ * - TON explorers (tonviewer.com/EQAv1WFDxGF21Xm67..., tonscan.org/address/EQAv1WFDxGF21Xm67...)
  */
 function extractAddress(input: string): string {
   const cleaned = input.trim();
 
-  // TODO: Replace with TON API - add TON-specific URL patterns
-  // Example: dexscreener.com/ton/..., tonviewer.com/...
-  return cleaned;
+  // Try to extract from URL patterns
+  try {
+    // DexScreener: dexscreener.com/ton/ADDRESS or dexscreener.com/ton/pairs/ADDRESS
+    const dexMatch = cleaned.match(/dexscreener\.com\/ton\/(?:pairs\/)?([a-zA-Z0-9_-]+)/i);
+    if (dexMatch) return dexMatch[1];
+
+    // GeckoTerminal: geckoterminal.com/ton/pools/ADDRESS
+    const geckoMatch = cleaned.match(/geckoterminal\.com\/ton\/pools\/([a-zA-Z0-9_-]+)/i);
+    if (geckoMatch) return geckoMatch[1];
+
+    // TON explorers: tonviewer.com/ADDRESS, tonscan.org/address/ADDRESS, tonwhales.com/explorer/address/ADDRESS
+    const explorerMatch = cleaned.match(/(?:tonviewer\.com|tonscan\.org\/address|tonwhales\.com\/explorer\/address)\/([a-zA-Z0-9_-]+)/i);
+    if (explorerMatch) return explorerMatch[1];
+
+    // If no URL pattern matched, assume it's a raw address
+    return cleaned;
+  } catch (e) {
+    // Fallback to raw input if regex fails
+    return cleaned;
+  }
 }
 
 export function useScanner(): UseScannerReturn {
@@ -148,8 +169,8 @@ export function useScanner(): UseScannerReturn {
         riskScore: 100 - scanResult.trustScore,
         auditedAt: new Date(scanResult.analyzedAt),
         recommendations: [scanResult.summary, ...scanResult.evidence],
-        bondingCurve: { isComplete: true, progress: 100, virtualSolReserves: 0, virtualTokenReserves: 0, realSolReserves: 0, realTokenReserves: 0 },
-        creatorAnalysis: { address: "", totalTokensCreated: 0, rugPullCount: 0, successfulTokens: 0, avgHoldTime: 0, totalSolExtracted: 0, firstActivityDate: new Date(), riskScore: 0 },
+        liquidityPool: { isComplete: true, progress: 100, virtualNativeReserves: 0, virtualTokenReserves: 0, realNativeReserves: 0, realTokenReserves: 0 },
+        creatorAnalysis: { address: "", totalTokensCreated: 0, rugPullCount: 0, successfulTokens: 0, avgHoldTime: 0, totalNativeExtracted: 0, firstActivityDate: new Date(), riskScore: 0 },
         creatorStatus: { creatorAddress: "", creatorPercentage: scanResult.onChain.creatorPercentage, creatorBalance: 0, isDumped: scanResult.onChain.isDumped, isWhale: scanResult.onChain.isWhale },
         riskFactors: [],
       });

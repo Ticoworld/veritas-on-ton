@@ -4,7 +4,7 @@
  */
 
 import { validateAddress, getTokenInfo, getHolderDistribution } from "@/lib/blockchain";
-import type { AuditResult, RiskLevel, RiskFactor, TokenData, BondingCurveStatus, CreatorWalletAnalysis, CreatorStatus } from "@/types";
+import type { AuditResult, RiskLevel, RiskFactor, TokenData, LiquidityPoolStatus, CreatorWalletAnalysis, CreatorStatus } from "@/types";
 import { analyzeTokenRisk, type AIAnalysisResult } from "@/lib/ai/analyst";
 import { getTokenSocials } from "@/lib/api/dexscreener";
 import { getCreatorHistory, type CreatorTokenHistory } from "@/lib/api/historian";
@@ -251,11 +251,11 @@ export async function analyzeToken(address: string): Promise<AuditResult> {
   // Fetch social links FIRST (needed for vision analysis)
   const socials = await getTokenSocials(address);
   
-  // Construct Microlink screenshot URL for vision analysis
+  // Store website URL for vision analysis
   let screenshotUrl: string | undefined;
   if (socials.website) {
-    screenshotUrl = `https://api.microlink.io/?url=${encodeURIComponent(socials.website)}&screenshot=true&meta=false&embed=screenshot.url&waitForTimeout=4000&waitUntil=networkidle0`;
-    console.log("[Veritas] 📸 Screenshot URL prepared for vision analysis");
+    screenshotUrl = socials.website;
+    console.log("[Veritas] 📸 Website URL prepared for vision analysis");
   }
 
   // The Historian: Fetch creator's token launch history
@@ -381,13 +381,13 @@ export async function analyzeToken(address: string): Promise<AuditResult> {
     createdAt: new Date(), // Would need transaction history for real date
   };
 
-  // Construct bonding curve status (placeholder for Pump.fun specific tokens)
-  const bondingCurve: BondingCurveStatus = {
-    isComplete: true, // Assume complete for non-Pump.fun tokens
+  // Construct liquidity pool status placeholder
+  const liquidityPool: LiquidityPoolStatus = {
+    isComplete: true,
     progress: 100,
-    virtualSolReserves: 0,
+    virtualNativeReserves: 0,
     virtualTokenReserves: 0,
-    realSolReserves: 0,
+    realNativeReserves: 0,
     realTokenReserves: 0,
   };
 
@@ -398,7 +398,7 @@ export async function analyzeToken(address: string): Promise<AuditResult> {
     rugPullCount: 0,
     successfulTokens: 0,
     avgHoldTime: 0,
-    totalSolExtracted: 0,
+    totalNativeExtracted: 0,
     firstActivityDate: new Date(),
     riskScore: finalScore,
   };
@@ -408,7 +408,7 @@ export async function analyzeToken(address: string): Promise<AuditResult> {
   return {
     tokenAddress: address,
     tokenData,
-    bondingCurve,
+    liquidityPool,
     creatorAnalysis,
     creatorStatus,
     socials, // Added social links

@@ -6,7 +6,7 @@
 import { getTokenSocials } from "./dexscreener";
 import { getMarketAnalysis, type MarketAnalysis } from "./market";
 import { getCreatorHistory, type CreatorTokenHistory } from "./historian";
-import { fetchScreenshotAsBase64, getMicrolinkUrl } from "./screenshot";
+import { fetchScreenshotAsBase64 } from "./screenshot";
 import type { TokenSocials } from "@/types";
 
 // =============================================================================
@@ -148,8 +148,7 @@ export async function fetchTruthData(address: string): Promise<TruthData> {
     screenshotPromises.push(
       (async () => {
         try {
-          const url = getMicrolinkUrl(tokenProfile.website!, true);
-          websiteScreenshot = await fetchScreenshotAsBase64(url);
+          websiteScreenshot = await fetchScreenshotAsBase64(tokenProfile.website!, { fullPage: true });
         } catch (e) {
           console.warn("[Truth Engine] Website screenshot failed:", e);
         }
