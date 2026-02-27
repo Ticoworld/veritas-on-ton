@@ -1,8 +1,8 @@
 /**
  * VERITAS UNIFIED API - Single Entry Point
- * 
+ *
  * POST /api/analyze-unified
- * 
+ *
  * Grand Unification: Replaces /api/scan and /api/analyze
  * Uses the VeritasInvestigator service for complete flow:
  * - Elephant Memory check
@@ -13,7 +13,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { VeritasInvestigator } from "@/lib/services/VeritasInvestigator";
-import { checkRateLimit, RateLimitExceededError } from "@/lib/security/RateLimiter";
+import {
+  checkRateLimit,
+  RateLimitExceededError,
+} from "@/lib/security/RateLimiter";
 
 function getClientIp(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -36,11 +39,30 @@ export async function POST(request: NextRequest) {
     if (!address || typeof address !== "string") {
       return NextResponse.json(
         { success: false, error: "Token address is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    console.log(`[Unified API] 🚀 Investigation request for ${address.slice(0, 8)}...`);
+    // ═══════════════════════════════════════════════════════════════════
+    // ADDRESS FORMAT GUARD — stops garbage before it hits TonAPI / Gemini
+    // TON user-friendly addresses are 36 bytes → 48 base64 chars (no padding).
+    // Both standard base64 (+/) and URL-safe base64 (-_) are valid per TON spec.
+    // ═══════════════════════════════════════════════════════════════════
+    const TON_ADDRESS_REGEX = /^[a-zA-Z0-9_\-+/]{48}$/;
+    if (!TON_ADDRESS_REGEX.test(address.trim())) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Invalid TON Address Format. A valid TON address is exactly 48 characters (base64).",
+        },
+        { status: 400 },
+      );
+    }
+
+    console.log(
+      `[Unified API] 🚀 Investigation request for ${address.slice(0, 8)}...`,
+    );
 
     // ═══════════════════════════════════════════════════════════════════
     // GRAND UNIFICATION: Single Service Orchestrates Everything
@@ -54,12 +76,14 @@ export async function POST(request: NextRequest) {
       data: result,
       timestamp: new Date().toISOString(),
     });
-
   } catch (error) {
     if (error instanceof RateLimitExceededError) {
       return NextResponse.json(
         { success: false, error: error.message },
-        { status: 429, headers: { "Retry-After": String(error.retryAfterSeconds) } }
+        {
+          status: 429,
+          headers: { "Retry-After": String(error.retryAfterSeconds) },
+        },
       );
     }
 
@@ -70,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       { success: false, error: message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

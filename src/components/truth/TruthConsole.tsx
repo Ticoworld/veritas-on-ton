@@ -123,6 +123,14 @@ export function TruthConsole() {
   const handleScan = async () => {
     if (!address.trim()) return;
 
+    // Client-side guard: reject before any network call
+    // TON user-friendly addresses: 48 chars, standard or URL-safe base64
+    const TON_ADDRESS_REGEX = /^[a-zA-Z0-9_\-+/]{48}$/;
+    if (!TON_ADDRESS_REGEX.test(address.trim())) {
+      setError("Invalid TON Address Format. A valid TON address is exactly 48 characters (base64).");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setResult(null);
