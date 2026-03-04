@@ -17,6 +17,7 @@ import {
   checkRateLimit,
   RateLimitExceededError,
 } from "@/lib/security/RateLimiter";
+import { validateTelegramData } from "@/lib/security/telegram";
 
 function getClientIp(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -27,6 +28,21 @@ function getClientIp(request: NextRequest): string {
 
 export async function POST(request: NextRequest) {
   try {
+    const initData = request.headers.get("x-telegram-init-data");
+    if (initData === null || initData === undefined) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
+    const botToken = process.env.TELEGRAM_BOT_TOKEN ?? "";
+    if (!validateTelegramData(initData, botToken)) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // RATE LIMIT (The Bouncer) - before any work
     // ═══════════════════════════════════════════════════════════════════

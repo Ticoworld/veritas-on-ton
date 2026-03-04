@@ -18,7 +18,7 @@ import { getCreatorHistory } from "@/lib/api/historian";
 import { fetchScreenshotAsBase64 } from "@/lib/api/screenshot";
 import { fetchTonSecurity, type TonSecurityReport } from "@/lib/api/tonsecurity";
 import { runUnifiedAnalysis, type UnifiedAnalysisInput, type UnifiedAnalysisResult } from "@/lib/ai/unified-analyzer";
-import { checkKnownScammer, flagScammer, type ScammerRecord } from "@/lib/db/elephant";
+import { checkKnownScammer, flagScammer, getCachedScan, saveScanResult, type ScammerRecord } from "@/lib/db/elephant";
 import { LRUCache } from "lru-cache";
 
 // =============================================================================
@@ -151,6 +151,12 @@ export class VeritasInvestigator {
     
     if (!validateAddress(tokenAddress)) {
       throw new Error("Invalid token address format");
+    }
+
+    const ledgerCached = await getCachedScan(tokenAddress);
+    if (ledgerCached) {
+      console.log(`[Veritas] ⚡ ThreatLedger cache hit for ${tokenAddress.slice(0, 8)}`);
+      return ledgerCached;
     }
 
     // =========================================================================
@@ -455,6 +461,7 @@ export class VeritasInvestigator {
       analysisTimeMs: elapsed,
     };
 
+    await saveScanResult(tokenAddress, finalResult, "unified");
     resultCache.set(cacheKey, finalResult);
     return finalResult;
   }

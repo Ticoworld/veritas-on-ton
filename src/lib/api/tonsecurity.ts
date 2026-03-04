@@ -21,14 +21,34 @@ export interface TonSecurityReport {
 }
 
 /**
- * Fetches token/contract security report for TON.
+ * Fetches jetton metadata from TonAPI. Maps to TonSecurityReport shape.
+ * TonAPI jettons endpoint returns metadata; risk score/risks are derived or default.
  *
- * @param tokenAddress - TON token/contract address
+ * @param tokenAddress - TON token/jetton address
  * @returns TonSecurityReport or null if unavailable
  */
-export async function fetchTonSecurity(_tokenAddress: string): Promise<TonSecurityReport | null> {
-  // TODO: Integrate TON contract audit or risk API when available.
-  return null;
+export async function fetchTonSecurity(tokenAddress: string): Promise<TonSecurityReport | null> {
+  try {
+    const res = await fetch(`https://tonapi.io/v2/jettons/${tokenAddress}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      metadata?: { name?: string; symbol?: string };
+      [key: string]: unknown;
+    };
+    const metadata = data?.metadata ?? {};
+    return {
+      score: 0,
+      risks: [],
+      tokenMeta: {
+        name: typeof metadata.name === "string" ? metadata.name : undefined,
+        symbol: typeof metadata.symbol === "string" ? metadata.symbol : undefined,
+      },
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**

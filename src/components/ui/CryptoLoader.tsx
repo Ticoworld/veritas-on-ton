@@ -2,7 +2,42 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ThinkingStep, type ThinkingStepStatus } from "./ThinkingStep";
+
+// Inlined from deleted ThinkingStep.tsx
+type ThinkingStepStatus = "pending" | "active" | "complete";
+
+function ThinkingStep({
+  label,
+  status,
+  delay = 0,
+}: {
+  label: string;
+  status: ThinkingStepStatus;
+  delay?: number;
+}) {
+  const icons: Record<ThinkingStepStatus, string> = {
+    pending: "○",
+    active: "◉",
+    complete: "●",
+  };
+  const colors: Record<ThinkingStepStatus, string> = {
+    pending: "text-zinc-600",
+    active: "text-emerald-400",
+    complete: "text-emerald-600",
+  };
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -4 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay }}
+      className={`flex items-center gap-2 text-xs font-mono ${colors[status]}`}
+    >
+      <span>{icons[status]}</span>
+      <span>{label}</span>
+    </motion.div>
+  );
+}
+
 
 interface CryptoLoaderProps {
   size?: number;

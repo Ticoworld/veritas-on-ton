@@ -28,6 +28,11 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+# Windows reserved device names (avoid accidental creation)
+nul
+con
+prn
+aux
 
 # Debug
 *.log

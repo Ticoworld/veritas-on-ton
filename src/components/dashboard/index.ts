@@ -1,2 +1,1 @@
-export { Scanner } from "./Scanner";
-export { UnifiedResultCard } from "./UnifiedResultCard";
+// Dashboard components removed (Scanner, UnifiedResultCard deleted)

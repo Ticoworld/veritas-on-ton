@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
+import { TonConnectProvider } from "@/components/providers/TonConnectProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -30,9 +32,17 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#09090b] text-white min-h-screen`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen`}
+        style={{
+          backgroundColor: "var(--tg-theme-bg-color, #09090b)",
+          color: "var(--tg-theme-text-color, #fff)",
+        }}
       >
-        {children}
+        <Script
+          src="https://telegram.org/js/telegram-web-app.js"
+          strategy="beforeInteractive"
+        />
+        <TonConnectProvider>{children}</TonConnectProvider>
       </body>
     </html>
   );

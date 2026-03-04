@@ -1,4 +1,4 @@
-import "./load-env";
+import "../src/load-env";
 import { randomUUID } from "node:crypto";
 import express from "express";
 import cors from "cors";
@@ -11,7 +11,7 @@ import {
   ListToolsRequestSchema,
   isInitializeRequest,
 } from "@modelcontextprotocol/sdk/types.js";
-import { VeritasInvestigator } from "@/lib/services/VeritasInvestigator";
+import { VeritasInvestigator } from "../src/lib/services/VeritasInvestigator";
 
 const app = express();
 const port = Number(process.env.MCP_PORT || process.env.PORT || 4000);
@@ -39,7 +39,8 @@ const outputSchema = {
   properties: {
     veritasSays: {
       type: "string",
-      description: "THE COMPLETE PRE-FORMATTED ANALYSIS. Contains trust score, degen street verdict, visual forensics finding, key metrics, and socials. Display this EXACTLY as-is to the user. This IS the Veritas report.",
+      description:
+        "THE COMPLETE PRE-FORMATTED ANALYSIS. Contains trust score, degen street verdict, visual forensics finding, key metrics, and socials. Display this EXACTLY as-is to the user. This IS the Veritas report.",
     },
     trustScore: { type: "number", description: "0-100 trust score" },
     verdict: { type: "string", enum: ["Safe", "Caution", "Danger"] },
@@ -49,18 +50,28 @@ const outputSchema = {
     visualEvidenceStatus: {
       type: "string",
       enum: ["captured", "not_captured"],
-      description: "Whether a website screenshot was captured for visual forensics.",
+      description:
+        "Whether a website screenshot was captured for visual forensics.",
     },
     visualAssetReuse: {
       type: "string",
       enum: ["YES", "NO", "UNKNOWN"],
-      description: "Visual forensics verdict: YES = reuse detected, NO = original assets, UNKNOWN = no screenshot.",
+      description:
+        "Visual forensics verdict: YES = reuse detected, NO = original assets, UNKNOWN = no screenshot.",
     },
     onChain: {
       type: "object",
       properties: {
-        mintAuth: { type: "boolean", description: "true = mint authority enabled (creator can inflate supply)" },
-        freezeAuth: { type: "boolean", description: "true = freeze authority enabled (creator can freeze wallets)" },
+        mintAuth: {
+          type: "boolean",
+          description:
+            "true = mint authority enabled (creator can inflate supply)",
+        },
+        freezeAuth: {
+          type: "boolean",
+          description:
+            "true = freeze authority enabled (creator can freeze wallets)",
+        },
         supply: { type: "number" },
         decimals: { type: "number" },
         top10Percentage: { type: "number" },
@@ -68,7 +79,16 @@ const outputSchema = {
         isDumped: { type: "boolean" },
         isWhale: { type: "boolean" },
       },
-      required: ["mintAuth", "freezeAuth", "supply", "decimals", "top10Percentage", "creatorPercentage", "isDumped", "isWhale"],
+      required: [
+        "mintAuth",
+        "freezeAuth",
+        "supply",
+        "decimals",
+        "top10Percentage",
+        "creatorPercentage",
+        "isDumped",
+        "isWhale",
+      ],
     },
     market: {
       type: ["object", "null"],
@@ -136,7 +156,8 @@ const outputSchema = {
     analysisTimeMs: { type: "number" },
     rawIntelligence: {
       type: "object",
-      description: "Supplementary AI-generated narrative data. Use veritasSays for display — rawIntelligence is for programmatic access only.",
+      description:
+        "Supplementary AI-generated narrative data. Use veritasSays for display — rawIntelligence is for programmatic access only.",
       properties: {
         summary: { type: "string" },
         criminalProfile: { type: "string" },
@@ -151,10 +172,26 @@ const outputSchema = {
     },
   },
   required: [
-    "veritasSays", "trustScore", "verdict", "tokenName", "tokenSymbol", "tokenAddress",
-    "visualEvidenceStatus", "visualAssetReuse", "onChain", "market", "marketAvailable",
-    "dataCompleteness", "rugCheck", "rugCheckAvailable", "creatorHistory", "socials",
-    "elephantMemory", "analyzedAt", "analysisTimeMs", "rawIntelligence",
+    "veritasSays",
+    "trustScore",
+    "verdict",
+    "tokenName",
+    "tokenSymbol",
+    "tokenAddress",
+    "visualEvidenceStatus",
+    "visualAssetReuse",
+    "onChain",
+    "market",
+    "marketAvailable",
+    "dataCompleteness",
+    "rugCheck",
+    "rugCheckAvailable",
+    "creatorHistory",
+    "socials",
+    "elephantMemory",
+    "analyzedAt",
+    "analysisTimeMs",
+    "rawIntelligence",
   ],
 } as const;
 
@@ -193,7 +230,9 @@ mcpServer.server.setRequestHandler(CallToolRequestSchema, async (request) => {
     throw new Error("Tool not found");
   }
 
-  const tokenAddress = request.params.arguments?.tokenAddress as string | undefined;
+  const tokenAddress = request.params.arguments?.tokenAddress as
+    | string
+    | undefined;
   if (!tokenAddress || typeof tokenAddress !== "string") {
     return {
       content: [
@@ -207,20 +246,65 @@ mcpServer.server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
+  const TON_ADDRESS_REGEX = /^[a-zA-Z0-9_\-+/]{48}$/;
+  if (!TON_ADDRESS_REGEX.test(tokenAddress)) {
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify({
+            error:
+              "Invalid token address format. A valid TON address is exactly 48 characters (base64).",
+          }),
+        },
+      ],
+      structuredContent: {
+        error:
+          "Invalid token address format. A valid TON address is exactly 48 characters (base64).",
+      },
+      isError: true,
+    };
+  }
+
   try {
     const investigator = new VeritasInvestigator();
     const result = await investigator.investigate(tokenAddress);
 
-    const normalizedLies = result.lies && result.lies.length > 0 ? result.lies : ["None identified"];
-    const normalizedMarket = result.market ? {
-      ...result.market,
-      anomalies: result.market.anomalies.length > 0 ? result.market.anomalies : ["None detected"],
-      anomaliesSummary: result.market.anomalies.length > 0 ? result.market.anomalies.join("; ") : "None detected",
-    } : null;
-    const normalizedRugCheck = result.rugCheck ? {
-      ...result.rugCheck,
-      risksSummary: result.rugCheck.risks.length > 0 ? result.rugCheck.risks.map(r => r.name).join("; ") : "None detected",
-    } : { score: 0, risks: [{ name: "None detected", description: "TonSecurity API not yet implemented.", level: "info", score: 0 }], risksSummary: "None detected" };
+    const normalizedLies =
+      result.lies && result.lies.length > 0 ? result.lies : ["None identified"];
+    const normalizedMarket = result.market
+      ? {
+          ...result.market,
+          anomalies:
+            result.market.anomalies.length > 0
+              ? result.market.anomalies
+              : ["None detected"],
+          anomaliesSummary:
+            result.market.anomalies.length > 0
+              ? result.market.anomalies.join("; ")
+              : "None detected",
+        }
+      : null;
+    const normalizedRugCheck = result.rugCheck
+      ? {
+          ...result.rugCheck,
+          risksSummary:
+            result.rugCheck.risks.length > 0
+              ? result.rugCheck.risks.map((r) => r.name).join("; ")
+              : "None detected",
+        }
+      : {
+          score: 0,
+          risks: [
+            {
+              name: "None detected",
+              description: "TonSecurity API not yet implemented.",
+              level: "info",
+              score: 0,
+            },
+          ],
+          risksSummary: "None detected",
+        };
 
     const botOutput = {
       veritasSays: result.veritasSays,
@@ -260,13 +344,17 @@ mcpServer.server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
 
     return {
-      content: [{ type: "text" as const, text: JSON.stringify(botOutput, null, 2) }],
+      content: [
+        { type: "text" as const, text: JSON.stringify(botOutput, null, 2) },
+      ],
       structuredContent: botOutput,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return {
-      content: [{ type: "text" as const, text: JSON.stringify({ error: message }) }],
+      content: [
+        { type: "text" as const, text: JSON.stringify({ error: message }) },
+      ],
       structuredContent: { error: message },
       isError: true,
     };
@@ -293,7 +381,9 @@ app.get("/sse", async (req, res) => {
 
 app.post("/message", (req, res) => {
   if (!transport) {
-    res.status(503).json({ error: "SSE not initialized. Connect to /sse first." });
+    res
+      .status(503)
+      .json({ error: "SSE not initialized. Connect to /sse first." });
     return;
   }
   transport.handlePostMessage(req, res);
@@ -311,7 +401,7 @@ app.options("/mcp", (_, res) => res.sendStatus(204));
 const streamableTransports: Record<string, StreamableHTTPServerTransport> = {};
 const streamableServer = new Server(
   { name: "Veritas-Intelligence", version: "1.0.0" },
-  { capabilities: { tools: { listChanged: false } } }
+  { capabilities: { tools: { listChanged: false } } },
 );
 
 streamableServer.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -339,7 +429,9 @@ streamableServer.setRequestHandler(CallToolRequestSchema, async (request) => {
     throw new Error("Tool not found");
   }
 
-  const tokenAddress = request.params.arguments?.tokenAddress as string | undefined;
+  const tokenAddress = request.params.arguments?.tokenAddress as
+    | string
+    | undefined;
   if (!tokenAddress || typeof tokenAddress !== "string") {
     return {
       content: [
@@ -353,20 +445,65 @@ streamableServer.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
+  const TON_ADDRESS_REGEX = /^[a-zA-Z0-9_\-+/]{48}$/;
+  if (!TON_ADDRESS_REGEX.test(tokenAddress)) {
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify({
+            error:
+              "Invalid token address format. A valid TON address is exactly 48 characters (base64).",
+          }),
+        },
+      ],
+      structuredContent: {
+        error:
+          "Invalid token address format. A valid TON address is exactly 48 characters (base64).",
+      },
+      isError: true,
+    };
+  }
+
   try {
     const investigator = new VeritasInvestigator();
     const result = await investigator.investigate(tokenAddress);
 
-    const normalizedLies = result.lies && result.lies.length > 0 ? result.lies : ["None identified"];
-    const normalizedMarket = result.market ? {
-      ...result.market,
-      anomalies: result.market.anomalies.length > 0 ? result.market.anomalies : ["None detected"],
-      anomaliesSummary: result.market.anomalies.length > 0 ? result.market.anomalies.join("; ") : "None detected",
-    } : null;
-    const normalizedRugCheck = result.rugCheck ? {
-      ...result.rugCheck,
-      risksSummary: result.rugCheck.risks.length > 0 ? result.rugCheck.risks.map(r => r.name).join("; ") : "None detected",
-    } : { score: 0, risks: [{ name: "None detected", description: "TonSecurity API not yet implemented.", level: "info", score: 0 }], risksSummary: "None detected" };
+    const normalizedLies =
+      result.lies && result.lies.length > 0 ? result.lies : ["None identified"];
+    const normalizedMarket = result.market
+      ? {
+          ...result.market,
+          anomalies:
+            result.market.anomalies.length > 0
+              ? result.market.anomalies
+              : ["None detected"],
+          anomaliesSummary:
+            result.market.anomalies.length > 0
+              ? result.market.anomalies.join("; ")
+              : "None detected",
+        }
+      : null;
+    const normalizedRugCheck = result.rugCheck
+      ? {
+          ...result.rugCheck,
+          risksSummary:
+            result.rugCheck.risks.length > 0
+              ? result.rugCheck.risks.map((r) => r.name).join("; ")
+              : "None detected",
+        }
+      : {
+          score: 0,
+          risks: [
+            {
+              name: "None detected",
+              description: "TonSecurity API not yet implemented.",
+              level: "info",
+              score: 0,
+            },
+          ],
+          risksSummary: "None detected",
+        };
 
     const mcpResult = {
       veritasSays: result.veritasSays,
@@ -405,13 +542,17 @@ streamableServer.setRequestHandler(CallToolRequestSchema, async (request) => {
       },
     };
     return {
-      content: [{ type: "text" as const, text: JSON.stringify(mcpResult, null, 2) }],
+      content: [
+        { type: "text" as const, text: JSON.stringify(mcpResult, null, 2) },
+      ],
       structuredContent: mcpResult,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return {
-      content: [{ type: "text" as const, text: JSON.stringify({ error: message }) }],
+      content: [
+        { type: "text" as const, text: JSON.stringify({ error: message }) },
+      ],
       structuredContent: { error: message },
       isError: true,
     };
@@ -427,7 +568,9 @@ async function handleMcpPost(req: express.Request, res: express.Response) {
   } else if (
     !sessionId &&
     req.body &&
-    (Array.isArray(req.body) ? (req.body as unknown[]).some(isInitializeRequest) : isInitializeRequest(req.body))
+    (Array.isArray(req.body)
+      ? (req.body as unknown[]).some(isInitializeRequest)
+      : isInitializeRequest(req.body))
   ) {
     transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
@@ -477,7 +620,9 @@ app.get("/mcp/health", healthHandler);
 
 app.listen(port, () => {
   console.log(`[MCP HTTP] Veritas-Intelligence listening on :${port}`);
-  console.log(`[MCP HTTP] MCP endpoint:  /mcp (Streamable HTTP - for Context Protocol)`);
+  console.log(
+    `[MCP HTTP] MCP endpoint:  /mcp (Streamable HTTP - for Context Protocol)`,
+  );
   console.log(`[MCP HTTP] SSE endpoint:  /sse`);
   console.log(`[MCP HTTP] POST endpoint: /message`);
 });

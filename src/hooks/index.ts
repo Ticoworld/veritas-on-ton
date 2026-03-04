@@ -1,1 +1,1 @@
-export { useScanner } from "./useScanner";
+// useScanner removed
