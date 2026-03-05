@@ -2,19 +2,16 @@ import { TruthConsole } from "@/components/truth/TruthConsole";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-8">
+    <main className="min-h-screen bg-zinc-950 flex flex-col items-center justify-start pt-12 px-4 pb-8">
       {/* Header + Hero */}
-      <div className="text-center mb-10">
+      <div className="text-center mb-8 w-full max-w-lg">
         <img 
           src="/images/logo.png" 
           alt="Veritas" 
           className="h-12 mx-auto mb-4"
         />
-        <h1 className="text-[#FAFAFA] text-xl font-medium mb-2">
-          Analyze TON tokens for scams before you buy
-        </h1>
-        <p className="text-[#71717A] text-sm max-w-md mx-auto">
-          Paste a token contract address → we analyze on-chain data, socials &amp; website → you get a verdict
+        <p className="text-[#A1A1AA] text-sm text-center max-w-md mx-auto">
+          Paste a TON contract address to verify on-chain data and detect visual scams.
         </p>
       </div>
 

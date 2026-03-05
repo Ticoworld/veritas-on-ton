@@ -182,10 +182,11 @@ export function TruthConsole() {
   };
 
   return (
-    <div className="w-full max-w-lg mx-auto px-3 flex flex-col gap-4">
-      <div className="flex justify-end py-2">
+    <>
+      <div className="fixed top-4 right-4 z-10">
         <TonConnectButton />
       </div>
+      <div className="w-full max-w-lg mx-auto px-3 flex flex-col gap-4">
       <div className="space-y-3">
         <span
           className="inline-flex items-center px-2 py-0.5 rounded border text-xs font-mono uppercase tracking-wide"
@@ -662,7 +663,8 @@ export function TruthConsole() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 
