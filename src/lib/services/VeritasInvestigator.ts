@@ -155,7 +155,23 @@ export class VeritasInvestigator {
 
     const ledgerCached = await getCachedScan(tokenAddress);
     if (ledgerCached) {
-      console.log(`[Veritas] ⚡ ThreatLedger cache hit for ${tokenAddress.slice(0, 8)}`);
+      console.log(`[Veritas] ⚡ ThreatLedger cache hit for ${tokenAddress.slice(0, 8)} — refreshing dynamic data`);
+      const [marketData, tokenInfo] = await Promise.all([
+        getMarketAnalysis(tokenAddress),
+        getTokenInfo(tokenAddress),
+      ]);
+      const supply = Number(tokenInfo.supply) / Math.pow(10, tokenInfo.decimals || 0);
+      ledgerCached.market = marketData ? {
+        liquidity: marketData.liquidity,
+        volume24h: marketData.volume24h,
+        marketCap: marketData.marketCap,
+        buySellRatio: marketData.buySellRatio,
+        ageInHours: marketData.ageInHours,
+        botActivity: marketData.botActivity,
+        anomalies: marketData.anomalies,
+      } : null;
+      ledgerCached.onChain.supply = supply;
+      ledgerCached.onChain.decimals = tokenInfo.decimals ?? ledgerCached.onChain.decimals;
       return ledgerCached;
     }
 
