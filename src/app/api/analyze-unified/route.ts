@@ -13,6 +13,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { VeritasInvestigator } from "@/lib/services/VeritasInvestigator";
+import { parseAndNormalizeTonAddress } from "@/lib/ton-address";
 import {
   checkRateLimit,
   RateLimitExceededError,
@@ -60,31 +61,28 @@ export async function POST(request: NextRequest) {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // ADDRESS FORMAT GUARD — stops garbage before it hits TonAPI / Gemini
-    // TON user-friendly addresses are 36 bytes → 48 base64 chars (no padding).
-    // Both standard base64 (+/) and URL-safe base64 (-_) are valid per TON spec.
+    // TON-aware address validation and normalization (same as bot)
     // ═══════════════════════════════════════════════════════════════════
-    const TON_ADDRESS_REGEX = /^[a-zA-Z0-9_\-+/]{48}$/;
-    if (!TON_ADDRESS_REGEX.test(address.trim())) {
+    const normalizedAddress = parseAndNormalizeTonAddress(address.trim());
+    if (!normalizedAddress) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Invalid TON Address Format. A valid TON address is exactly 48 characters (base64).",
+          error: "Invalid TON address. Send the jetton contract address in TON-friendly format (base64).",
         },
         { status: 400 },
       );
     }
 
     console.log(
-      `[Unified API] 🚀 Investigation request for ${address.slice(0, 8)}...`,
+      `[Unified API] 🚀 Investigation request for ${normalizedAddress.slice(0, 8)}...`,
     );
 
     // ═══════════════════════════════════════════════════════════════════
     // GRAND UNIFICATION: Single Service Orchestrates Everything
     // ═══════════════════════════════════════════════════════════════════
     const investigator = new VeritasInvestigator();
-    const result = await investigator.investigate(address);
+    const result = await investigator.investigate(normalizedAddress);
 
     // Return standardized response
     return NextResponse.json({

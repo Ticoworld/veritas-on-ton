@@ -114,6 +114,8 @@ export interface InvestigationResult {
   
   analyzedAt: string;
   analysisTimeMs: number;
+  /** When VERITAS_SAVE_SCREENSHOTS is true and capture succeeded; relative path e.g. /screenshots/scan-website-{uuid}.jpg */
+  screenshotPublicUrl?: string;
 }
 
 // =============================================================================
@@ -475,6 +477,7 @@ export class VeritasInvestigator {
       },
       analyzedAt: new Date().toISOString(),
       analysisTimeMs: elapsed,
+      screenshotPublicUrl: websiteScreenshot?.publicUrl,
     };
 
     await saveScanResult(tokenAddress, finalResult, "unified");
