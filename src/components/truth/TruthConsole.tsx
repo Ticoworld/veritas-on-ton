@@ -472,7 +472,7 @@ function SkeletonSlowVision() {
           <div className="h-2.5 w-4/5 rounded animate-pulse" style={bgStyle} />
         </div>
         <div className="px-4 py-1.5 border-t text-center" style={borderStyle}>
-          <span className="text-[9px] font-mono" style={{ color: "var(--tg-theme-hint-color)" }}>NFA • DYOR • Powered by Gemini</span>
+          <span className="text-[9px] font-mono" style={{ color: "var(--tg-theme-hint-color)" }}>Not financial advice. Powered by Gemini.</span>
         </div>
       </div>
     </div>
@@ -501,17 +501,33 @@ function SlowVision({
     <div className="rounded-lg border overflow-hidden" style={{ ...cardStyle, border: "1px solid var(--tg-theme-hint-color, #27272A)" }}>
       <div className="flex items-center justify-between px-4 py-2 border-b" style={borderStyle}>
         <div className="flex items-center gap-2">
-          <VerdictBadge verdict={result.verdict.toUpperCase()} />
-          {result.elephantMemory?.isKnownScammer && (
-            <span className="text-xs font-mono uppercase" style={{ color: "var(--tg-theme-destructive-text-color, #FCA5A5)" }}>Known Criminal</span>
-          )}
+          <VerdictBadge verdict={result.verdict} isKnownScammer={result.elephantMemory?.isKnownScammer} />
         </div>
         <span className="text-[10px] font-mono" style={{ color: "var(--tg-theme-hint-color)" }}>
           {(result.analysisTimeMs / 1000).toFixed(1)}s
         </span>
       </div>
       <div className="p-5 space-y-4">
-        <h2 className="text-lg font-medium" style={{ color: "var(--tg-theme-text-color)" }}>{result.criminalProfile}</h2>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-mono" style={{ color: "var(--tg-theme-hint-color)" }}>Trust score</span>
+          <span className="font-mono font-medium" style={{ color: "var(--tg-theme-text-color)" }}>{result.trustScore}/100</span>
+        </div>
+        {(result.evidence?.length > 0 || result.analysis?.length > 0) && (
+          <div>
+            <span className="text-[10px] font-mono uppercase" style={{ color: "var(--tg-theme-hint-color)" }}>Top reasons</span>
+            <ul className="mt-1 space-y-0.5">
+              {(result.evidence?.length ? result.evidence : result.analysis)?.slice(0, 3).map((line, i) => (
+                <li key={i} className="text-xs font-mono" style={{ color: "var(--tg-theme-text-color)" }}>• {line}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {(result.visualEvidenceStatus === "not_captured" || !result.market || result.market.liquidity === 0) && (
+          <p className="text-[10px] font-mono" style={{ color: "var(--tg-theme-hint-color)" }}>
+            Limitations: {[result.visualEvidenceStatus === "not_captured" && "Visual not captured", (!result.market || result.market.liquidity === 0) && "Limited market data"].filter(Boolean).join("; ")}
+          </p>
+        )}
+        <h2 className="text-sm font-medium" style={{ color: "var(--tg-theme-text-color)" }}>{result.criminalProfile}</h2>
         <p className="text-sm leading-relaxed" style={{ color: "var(--tg-theme-hint-color, #A1A1AA)" }}>{result.summary}</p>
         {result.thoughtSummary && (
           <details className="pt-4 border-t group" style={borderStyle}>
@@ -524,7 +540,7 @@ function SlowVision({
         <div className="rounded border p-3" style={cardStyle}>
           <div className="flex items-center gap-2 mb-2">
             <Terminal className="w-4 h-4" style={{ color: "var(--tg-theme-link-color, #22C55E)" }} />
-            <span className="text-xs font-mono uppercase" style={{ color: "var(--tg-theme-link-color, #22C55E)" }}>Veritas Says</span>
+            <span className="text-xs font-mono uppercase" style={{ color: "var(--tg-theme-link-color, #22C55E)" }}>Assessment</span>
           </div>
           <p className="font-mono text-sm leading-relaxed" style={{ color: "var(--tg-theme-text-color)" }}>{result.degenComment}</p>
         </div>
@@ -608,7 +624,7 @@ function SlowVision({
         </div>
       </div>
       <div className="px-4 py-1.5 border-t text-center" style={borderStyle}>
-        <span className="text-[9px] font-mono" style={{ color: "var(--tg-theme-hint-color)" }}>NFA • DYOR • Powered by Gemini</span>
+        <span className="text-[9px] font-mono" style={{ color: "var(--tg-theme-hint-color)" }}>Not financial advice. Powered by Gemini.</span>
       </div>
     </div>
   );
@@ -619,7 +635,16 @@ function SlowVision({
 // SUBCOMPONENTS
 // =============================================================================
 
-function VerdictBadge({ verdict }: { verdict: string }) {
+function getDisplayVerdict(verdict: string, isKnownScammer?: boolean): string {
+  if (isKnownScammer) return "Known scammer";
+  const v = verdict.toLowerCase();
+  if (v === "safe") return "Likely legitimate";
+  if (v === "caution") return "Suspicious";
+  if (v === "danger") return "High risk";
+  return verdict;
+}
+
+function VerdictBadge({ verdict, isKnownScammer }: { verdict: string; isKnownScammer?: boolean }) {
   const config: Record<
     string,
     { bg: string; border: string; color: string; icon: React.ReactNode }
@@ -649,8 +674,9 @@ function VerdictBadge({ verdict }: { verdict: string }) {
       icon: <Skull className="w-4 h-4" />,
     },
   };
-
-  const c = config[verdict] || config.CAUTION;
+  const styleKey = isKnownScammer ? "SCAM" : verdict.toUpperCase();
+  const c = config[styleKey] || config.CAUTION;
+  const label = getDisplayVerdict(verdict, isKnownScammer);
 
   return (
     <div
@@ -658,8 +684,8 @@ function VerdictBadge({ verdict }: { verdict: string }) {
       style={{ backgroundColor: c.bg, borderColor: c.border }}
     >
       <span style={{ color: c.color }}>{c.icon}</span>
-      <span className="text-sm font-medium uppercase tracking-wide" style={{ color: c.color }}>
-        {verdict}
+      <span className="text-sm font-medium tracking-wide" style={{ color: c.color }}>
+        {label}
       </span>
     </div>
   );

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Veritas Unified Analyzer v2.0
  * Single call to Gemini with URL Context + Google Search grounding
  * Replaces the two-phase Scanner + Sherlock flow
@@ -108,54 +108,40 @@ function buildUnifiedPrompt(data: UnifiedAnalysisInput, hasScreenshot: boolean):
 - Age: ${ageDisplay}
 ` : '';
 
-  // Vision instructions — THIS IS VERITAS'S PRIMARY EDGE
+  // Vision instructions — forensic output only; no page-structure narration
   const visionInstructions = hasScreenshot ? `
-## ⚠️ CRITICAL: VISUAL ASSET REUSE DETECTION (GEMINI VISION — YOUR PRIMARY JOB)
-I have attached ONE screenshot (the project website). USE IT. Do not rely on URL context — use the image.
+## VISUAL FORENSICS (PRIMARY)
+I have attached ONE screenshot (the project website). Use the image to assess visual trust signals only.
 
-### STEP 1: ENUMERATE EVERY SECTION YOU SEE
-Go through the website screenshot FROM TOP TO BOTTOM:
-- Hero section — what's visible? Any token name, price, or CTA buttons?
-- Tokenomics section — what does it say? Any supply/distribution claims?
-- Socials section — which platforms are listed?
-- Footer — any disclaimers or contract addresses?
+DO NOT narrate page structure (e.g. "header, hero, footer"). Output ONLY decision-relevant findings.
 
-### STEP 2: VISUAL ASSET REUSE DETECTION (MANDATORY)
-Detect if this site uses recycled/scam template design:
-- Does it resemble a KNOWN scam landing page? (generic "Buy $TOKEN" hero, copy-paste layout)
-- Fake partnership logos? (Binance, CoinGecko, CertiK pasted on without substance)
-- Stolen or recycled imagery from other TON/crypto projects?
-- Generic "Locked Liquidity" or "0% Tax" badges with no real backing?
-- Same layout/fonts as typical TON scam sites?
-- Stock images or AI-generated art that looks templated?
-
-**You MUST state in visualAnalysis: "VISUAL ASSET REUSE: [YES/NO]. [Specific evidence from what you SEE]."**
-**Meme culture reuse (Pepe, Wojak, Doge, iconic meme imagery) = NEUTRAL. Community art is fine.**
-**DO NOT call it "minimalist" unless you have enumerated every section and confirmed nothing else exists.**
+In visualAnalysis you MUST:
+1. State exactly: "VISUAL ASSET REUSE: YES" or "VISUAL ASSET REUSE: NO".
+2. In 1-3 short sentences, give forensic meaning only:
+   - If NO: e.g. "No major visual deception detected. Branding appears original in this scan." or "No suspicious trust-badge or partner-claim reuse observed."
+   - If YES: what was detected (e.g. template match to known scam layouts, fake partnership logos, recycled branding).
+   - If unclear: "Visual analysis inconclusive; asset reuse could not be determined."
+3. Meme culture imagery (Pepe, Wojak, Doge, community art) = NEUTRAL. Do not treat as scam signal.
 ` : '';
 
   const noScreenshotInstructions = !hasScreenshot ? `
-## ⚠️ NO SCREENSHOT — TEXT-ONLY ANALYSIS
+## NO SCREENSHOT — TEXT-ONLY ANALYSIS
 Screenshot capture failed or no real website URL was found. You have NO image data.
 - Do NOT describe, infer, or hallucinate any visual content.
-- Do NOT invent what the website or Twitter might look like.
-- Base analysis ONLY on the on-chain and market data below.
 - Leave visualAnalysis as an empty string — the system will handle it.
 ` : '';
 
   const missingWebsiteFlagSection = data.missingWebsiteFlag ? `
-## 🚨 CRITICAL RISK FLAG (AUTO-INJECTED)
+## CRITICAL RISK FLAG (AUTO-INJECTED)
 **${data.missingWebsiteFlag}**
 ` : '';
 
   const investigationSteps = hasScreenshot ? `
 # INVESTIGATION STEPS
 
-## Step 1: VISION ANALYSIS (PRIMARY — MANDATORY)
-Read every word in the website screenshot, section by section from top to bottom.
-1. List every section you see (hero, tokenomics, socials, footer)
-2. Cross-examine: if the site claims "renounced", does on-chain confirm? Does the contract address match?
-3. Lies = website claims contradict on-chain facts
+## Step 1: VISION ANALYSIS (PRIMARY)
+Assess the screenshot for template reuse and deceptive visuals only. Do not narrate layout.
+Cross-check: if the site claims "renounced" or contract address, does on-chain confirm? Lies = claims that contradict on-chain facts.
 
 ## Step 2: GOOGLE SEARCH (OPTIONAL)
 Search "${data.tokenName} TON scam" or "rugpull" if useful.
@@ -164,30 +150,28 @@ Search "${data.tokenName} TON scam" or "rugpull" if useful.
 
 ## Step 1: METADATA ANALYSIS (ONLY SOURCE)
 Use ONLY the on-chain and market data above. Do NOT claim to have seen any website.
-Do not describe or infer visual content — leave visualAnalysis empty.
+Leave visualAnalysis empty.
 
 ## Step 2: GOOGLE SEARCH (OPTIONAL)
 Search "${data.tokenName} TON scam" or "rugpull" if useful.
 `;
 
   return `
-You are VERITAS — a battle-hardened TON degen who has been rekt enough times to know exactly what a rug looks like. You speak from the trenches, not a compliance manual. Short, sharp, no fluff.
+You are VERITAS — a security-focused analyst for TON tokens. Use evidence-based language only. No hype, no slang, no emojis.
 
 YOUR MINDSET:
-- Think RISK/REWARD, not pass/fail. A dev selling some tokens is expected — it's not automatically bad.
-- Not every token is a scam. Clean contract + decent distribution = NORMAL. Say so.
-- Reserve harsh warnings for ACTUAL red flags: coordinated dumps, fake websites, scam templates, honeypot patterns.
-- If the on-chain data looks clean and you found nothing wrong, say so. Don't manufacture FUD.
-- When writing degenComment: you are tweeting from CT (crypto twitter). Use real degen vocabulary: anon, fren, the trenches, bags, send it, ngmi, wagmi, cooked, rekt, based, moonbag, ape in/out. Emojis mandatory. Be specific to THIS token — not generic advice.
+- Reserve strong warnings for actual red flags: scam templates, fake websites, honeypot patterns, coordinated dumps.
+- Clean contract and reasonable distribution = state so. Do not manufacture risk when data is clean.
+- Do not overclaim. Matching a website does not "confirm" legitimacy — it can "support a lower-risk assessment" or "is consistent with the project's official presence in this scan." Never say that visual or website match "proves" or "confirms" safety.
 
 # TOKEN UNDER INVESTIGATION
 - Name: ${data.tokenName} (${data.tokenSymbol})
 - Contract: ${data.tokenAddress}
 
 ## ON-CHAIN FACTS (GROUND TRUTH)
-- Mint Authority: ${data.mintAuth ? "ENABLED — can mint infinite tokens 🚨" : "Disabled (renounced) ✓"}
-- Freeze Authority: ${data.freezeAuth ? "ENABLED — can freeze your tokens 🚨" : "Disabled (renounced) ✓"}
-- Top 10 Holders: ${data.top10Percentage.toFixed(2)}% ${data.top10Percentage > 50 ? "(HIGH CONCENTRATION ⚠️)" : ""}
+- Mint Authority: ${data.mintAuth ? "ENABLED (supply can be changed)" : "Disabled (renounced)"}
+- Freeze Authority: ${data.freezeAuth ? "ENABLED (holder balances can be frozen)" : "Disabled (renounced)"}
+- Top 10 Holders: ${data.top10Percentage.toFixed(2)}% ${data.top10Percentage > 50 ? "(high concentration)" : ""}
 - Creator: ${creatorStatus}
 ${marketSection}
 ${visionInstructions}
@@ -201,13 +185,13 @@ ${investigationSteps}
 {
   "trustScore": <0-100>,
   "verdict": "<Safe | Caution | Danger>",
-  "summary": "<2 sentences max. What did you find?>",
-  "criminalProfile": "<Max 8 words. e.g. 'The Template Launcher' or 'Legit TON Community Play'>",
+  "summary": "<2 sentences max. Professional, evidence-based. Do not overclaim. Website match can support lower-risk assessment but does not prove safety.>",
+  "criminalProfile": "<Max 8 words. e.g. 'Template launcher' or 'Clean contract, no red flags'>",
   "lies": ["<Specific lie found>", "<Another if any>"],
   "evidence": ["<Key finding 1>", "<Key finding 2>", "<Key finding 3>"],
   "analysis": ["<Security check>", "<Market read>", "<Website assessment>"],
-  "visualAnalysis": "${hasScreenshot ? "MANDATORY: Describe exactly what you SAW in the screenshot. MUST include 'VISUAL ASSET REUSE: YES/NO' and specific evidence (template design, fake logos, recycled imagery, layout)." : ""}",
-  "degenComment": "<2-3 SHORT punchy sentences. CT tweet voice. Degen vocabulary. Emojis mandatory. Specific to THIS token. NFA always.>"
+  "visualAnalysis": "${hasScreenshot ? "MANDATORY: Start with 'VISUAL ASSET REUSE: YES' or 'VISUAL ASSET REUSE: NO'. Then 1-3 short forensic sentences only (no page-structure narration)." : ""}",
+  "degenComment": "<One short, professional takeaway. No slang, no emojis. E.g. 'On-chain and visual checks support a lower-risk assessment; other risks remain outside this scan.'>"
 }
 
 # SCORING RULES (trustScore must respect these caps)
@@ -261,7 +245,7 @@ function parseUnifiedResponse(text: string): UnifiedAnalysisResult | null {
       evidence: Array.isArray(parsed.evidence) ? parsed.evidence : [],
       analysis: Array.isArray(parsed.analysis) ? parsed.analysis : [],
       visualAnalysis: parsed.visualAnalysis,
-      degenComment: parsed.degenComment || "Do your own research, anon. 🔍",
+      degenComment: parsed.degenComment || "Assessment complete. Consider other risks outside this scan.",
     };
   } catch (error) {
     console.error("[Unified Analyzer] Failed to parse response:", error);

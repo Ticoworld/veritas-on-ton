@@ -361,8 +361,8 @@ export class VeritasInvestigator {
 
     const visualEvidenceSummary = rawVisual
       ? hasReuseYes
-        ? `⚠️ VISUAL ASSET REUSE DETECTED. ${rawVisual.replace(/.*VISUAL ASSET REUSE:\s*YES\.?\s*/i, "").slice(0, 120)}`
-        : `✅ ORIGINAL ASSETS. ${rawVisual.replace(/.*VISUAL ASSET REUSE:\s*NO\.?\s*/i, "").slice(0, 120)}`
+        ? `Possible scam template reuse detected. ${rawVisual.replace(/.*VISUAL ASSET REUSE:\s*YES\.?\s*/i, "").trim().slice(0, 100)}`
+        : `No major visual deception detected. Branding appears original in this scan. ${rawVisual.replace(/.*VISUAL ASSET REUSE:\s*NO\.?\s*/i, "").trim().slice(0, 80)}`
       : !websiteUrl
       ? "No website — visual forensics not applicable."
       : !isRealWebsite
@@ -370,11 +370,15 @@ export class VeritasInvestigator {
       : "Screenshot failed — visual forensics unavailable.";
 
     const visualAnalysisFinal = rawVisual
-      ? rawVisual
+      ? (hasReuseYes
+          ? "VISUAL ASSET REUSE: YES. Possible scam template or recycled branding detected. See evidence above."
+          : hasReuseNo
+            ? "VISUAL ASSET REUSE: NO. No major visual deception detected. Branding appears original in this scan. No suspicious trust-badge or partner-claim reuse observed."
+            : "Visual analysis performed; asset reuse could not be determined. See full report for details.")
       : !websiteUrl
       ? "No website found. Visual analysis could not be performed."
       : !isRealWebsite
-      ? `Website URL appears to be a social media or redirect link (${websiteUrl}). No screenshot was captured.`
+      ? `Website URL appears to be a social media or redirect link. No screenshot was captured.`
       : "Screenshot capture failed. Visual analysis could not be performed.";
 
     // =========================================================================
@@ -397,21 +401,21 @@ export class VeritasInvestigator {
     ].filter(Boolean).join(" | ");
 
     const veritasSays = [
-      `🔍 VERITAS FORENSIC REPORT: ${tokenName} ($${tokenSymbol})`,
+      `VERITAS FORENSIC REPORT: ${tokenName} ($${tokenSymbol})`,
       `Trust Score: ${finalScore}/100 — ${finalVerdict}`,
       `Profile: ${aiResult.criminalProfile}`,
       ``,
-      aiResult.degenComment,
+      aiResult.summary,
       ``,
-      `👁 VISUAL FORENSICS: ${visualEvidenceSummary}`,
+      `VISUAL: ${visualEvidenceSummary}`,
       ``,
-      `📊 KEY DATA:`,
-      `• Market Cap: ${fmt(marketData?.marketCap)} | Liquidity: ${fmt(marketData?.liquidity)} | 24h Volume: ${fmt(marketData?.volume24h)}`,
-      `• Top 10 Holders: ${top10Percentage.toFixed(1)}% | Creator: ${creatorStatus.creatorPercentage.toFixed(1)}%${creatorStatus.isDumped ? " (Dumped)" : ""}`,
-      `• Contract: Mint ${tokenInfo.mintAuthority ? "⚠️ Enabled" : "✅ Disabled"} | Freeze ${tokenInfo.freezeAuthority ? "⚠️ Enabled" : "✅ Disabled"}`,
-      rugCheckReport ? `• TonSecurity: ${rugCheckReport.score}/100` : null,
-      marketData ? `• Age: ${ageDisplay}` : null,
-      socialsLine ? `\n🔗 ${socialsLine}` : null,
+      `KEY DATA:`,
+      `Market Cap: ${fmt(marketData?.marketCap)} | Liquidity: ${fmt(marketData?.liquidity)} | 24h Vol: ${fmt(marketData?.volume24h)}`,
+      `Top 10: ${top10Percentage.toFixed(1)}% | Creator: ${creatorStatus.creatorPercentage.toFixed(1)}%${creatorStatus.isDumped ? " (Dumped)" : ""}`,
+      `Mint: ${tokenInfo.mintAuthority ? "Enabled" : "Disabled"} | Freeze: ${tokenInfo.freezeAuthority ? "Enabled" : "Disabled"}`,
+      rugCheckReport ? `TonSecurity: ${rugCheckReport.score}/100` : null,
+      marketData ? `Age: ${ageDisplay}` : null,
+      socialsLine ? `\n${socialsLine}` : null,
     ].filter(x => x !== null).join("\n");
     
     // =========================================================================
@@ -593,29 +597,27 @@ export class VeritasInvestigator {
         `Detection count: ${knownScammer.scanCount} times`,
       ],
       analysis: [
-        "🚨 INSTANT BLOCK — Elephant Memory triggered",
-        "This creator has been permanently flagged",
-        "No further analysis required — avoid at all costs",
+        "Instant block — Elephant Memory triggered.",
+        "This creator has been permanently flagged.",
+        "Do not interact.",
       ],
       visualAnalysis: "No visual analysis — known scammer fast-path.",
       visualEvidenceStatus: "not_captured" as const,
       visualAssetReuse: "UNKNOWN" as const,
       visualEvidenceSummary: "No visual analysis — known scammer fast-path.",
       veritasSays: [
-        `🔍 VERITAS FORENSIC REPORT: ${tokenName} ($SCAM)`,
-        `Trust Score: 0/100 — Danger`,
+        `VERITAS FORENSIC REPORT: ${tokenName} ($SCAM)`,
+        `Trust Score: 0/100 — High risk`,
         `Profile: The Repeat Offender`,
         ``,
-        `This dev already rugged before. ${knownScammer.scanCount}th token. RUN. 🚫`,
+        `This token is linked to a creator previously flagged for fraud. Do not interact.`,
         ``,
-        `👁 VISUAL FORENSICS: No visual analysis — known scammer fast-path.`,
+        `VISUAL: No visual analysis — known scammer fast-path.`,
         ``,
-        `📊 KEY DATA:`,
-        `• 🚨 KNOWN SCAMMER — Wallet flagged: ${knownScammer.flaggedAt.toISOString().split('T')[0]}`,
-        `• Previous scam: ${knownScammer.tokenName || "Unknown"}`,
-        `• Detection count: ${knownScammer.scanCount}`,
+        `KNOWN SCAMMER — Wallet flagged: ${knownScammer.flaggedAt.toISOString().split('T')[0]}`,
+        `Previous scam: ${knownScammer.tokenName || "Unknown"} | Detection count: ${knownScammer.scanCount}`,
       ].join("\n"),
-      degenComment: `This dev already rugged before. ${knownScammer.scanCount}th token. RUN. 🚫`,
+      degenComment: `Creator previously flagged. Do not interact.`,
       tokenAddress,
       tokenName,
       tokenSymbol: "SCAM",

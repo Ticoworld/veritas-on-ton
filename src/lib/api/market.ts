@@ -69,30 +69,30 @@ function detectBotActivity(
   const anomalies: string[] = [];
   let riskPoints = 0;
 
-  // Liquidity Ratio Check (< 1% is very suspicious)
+  // Liquidity ratio: neutral wording; low ratio alone does not mean scam
   if (liquidityRatio < 1 && liquidityRatio > 0) {
-    anomalies.push("⚠️ Liquidity Scam Risk: Liquidity < 1% of market cap");
-    riskPoints += 3;
+    anomalies.push("Low liquidity relative to market cap (<1%). This signal alone does not indicate a scam.");
+    riskPoints += 2;
   } else if (liquidityRatio < 5 && liquidityRatio > 0) {
-    anomalies.push("⚠️ Low Liquidity: Only " + liquidityRatio.toFixed(1) + "% of market cap");
+    anomalies.push("Liquidity-to-market-cap ratio is low (" + liquidityRatio.toFixed(1) + "%). Consider with other factors.");
     riskPoints += 1;
   }
 
   // Buy/Sell Ratio Check (> 20:1 = honeypot risk)
   if (buySellRatio > 20) {
-    anomalies.push("🚨 Honeypot Risk: Buy/Sell ratio is " + buySellRatio.toFixed(0) + ":1 (Cannot sell?)");
+    anomalies.push("Honeypot risk: Buy/Sell ratio " + buySellRatio.toFixed(0) + ":1 (sells may be restricted).");
     riskPoints += 3;
   } else if (buySellRatio > 10) {
-    anomalies.push("⚠️ Abnormal Trading: Buy/Sell ratio is " + buySellRatio.toFixed(1) + ":1");
+    anomalies.push("Abnormal trading: Buy/Sell ratio " + buySellRatio.toFixed(1) + ":1.");
     riskPoints += 2;
   }
 
-  // Wash Trade Score Check (> 100x volume/liquidity is fake)
+  // Wash Trade Score Check
   if (washTradeScore > 100 && liquidityRatio > 0) {
-    anomalies.push("🚨 Fake Volume: Wash trade score " + washTradeScore.toFixed(0) + "x (Bot activity!)");
+    anomalies.push("High volume relative to liquidity (" + washTradeScore.toFixed(0) + "x in 24h). Possible wash trading or bot activity.");
     riskPoints += 3;
   } else if (washTradeScore > 50 && liquidityRatio > 0) {
-    anomalies.push("⚠️ Suspicious Volume: " + washTradeScore.toFixed(0) + "x liquidity in 24h");
+    anomalies.push("Elevated volume: " + washTradeScore.toFixed(0) + "x liquidity in 24h.");
     riskPoints += 2;
   }
 
