@@ -10,6 +10,9 @@ import {
   ThinkingLevel,
 } from "@google/genai";
 import { getGeminiClient, isGeminiAvailable } from "@/lib/gemini";
+import type { Claim, ClaimType, VerificationStatus } from "@/lib/claims";
+
+export type { Claim, ClaimType, VerificationStatus };
 
 /**
  * Complete analysis result - unified verdict
@@ -19,24 +22,27 @@ export interface UnifiedAnalysisResult {
   trustScore: number; // 0-100, where 100 is safest
   verdict: "Safe" | "Caution" | "Danger";
   summary: string;
-  
+
   // Sherlock-style profiling
   criminalProfile: string;
-  
+
   // Evidence and reasoning
   lies: string[];      // False claims found
   evidence: string[];  // Key findings
   analysis: string[];  // Security check results
-  
+
+  // Structured claims (Phase 1: trust investigation)
+  claims: Claim[];
+
   // Visual analysis (if screenshot provided)
   visualAnalysis?: string;
-  
+
   // Degen Commentary - The Real Talk
   degenComment: string; // Short, punchy, slang-filled take with emojis
-  
+
   // Metadata
   urlsAnalyzed?: string[];
-  
+
   /** Thought summary from Gemini (includeThoughts: true) — reasoning trace for UI */
   thoughtSummary?: string;
 }
@@ -181,6 +187,16 @@ ${data.websiteUrl ? `Website: ${data.websiteUrl}` : 'No website (high risk flag 
 ${data.twitterUrl ? `Twitter/X: ${data.twitterUrl}` : ''}
 ${investigationSteps}
 
+# CLAIMS EXTRACTION (REQUIRED)
+Extract website trust claims into a structured "claims" array. For each claim found on the site or in the screenshot, add one object.
+Claim types (use exactly): audit | partner | sponsor | ecosystem | renounced | listing
+Verification status (use exactly): verified | unverified | contradicted | unknown
+- verified: you found independent support (e.g. audit report, official listing, on-chain matches).
+- unverified: claim is present but no independent support found in this scan (do NOT use "fake" or "fraudulent").
+- contradicted: claim is directly contradicted by on-chain data or a reliable source (e.g. "renounced" but mint/freeze enabled).
+- unknown: could not determine (e.g. no search result, ambiguous).
+Do not overclaim. If evidence is weak, use unverified or unknown. For "renounced" / "immutable" / "safe contract" claims, set status based on ON-CHAIN FACTS above (mint/freeze). For audit/partner/sponsor/ecosystem/listing, use Google Search or URL context when helpful; if no public support found, mark unverified.
+
 # OUTPUT FORMAT — Respond with ONLY this JSON:
 {
   "trustScore": <0-100>,
@@ -190,6 +206,9 @@ ${investigationSteps}
   "lies": ["<Specific lie found>", "<Another if any>"],
   "evidence": ["<Key finding 1>", "<Key finding 2>", "<Key finding 3>"],
   "analysis": ["<Security check>", "<Market read>", "<Website assessment>"],
+  "claims": [
+    { "type": "<audit|partner|sponsor|ecosystem|renounced|listing>", "rawClaim": "<short claim text>", "sourceContext": "<optional>", "verificationStatus": "<verified|unverified|contradicted|unknown>", "evidence": "<short reason>" }
+  ],
   "visualAnalysis": "${hasScreenshot ? "MANDATORY: Start with 'VISUAL ASSET REUSE: YES' or 'VISUAL ASSET REUSE: NO'. Then 1-3 short forensic sentences only (no page-structure narration)." : ""}",
   "degenComment": "<One short, professional takeaway. No slang, no emojis. E.g. 'On-chain and visual checks support a lower-risk assessment; other risks remain outside this scan.'>"
 }
@@ -209,7 +228,36 @@ ${investigationSteps}
 - Only list ACTUAL lies (website claims vs on-chain reality).
 - If you found NO lies, return ["None identified"].
 - Do NOT manufacture lies. Clean token = say so.
+
+# CLAIMS ARRAY RULES
+- If no trust claims are visible on the site, return "claims": [].
+- Each claim must have type, rawClaim, verificationStatus, evidence. sourceContext is optional.
+- Use only the verification statuses above. Never use "fake", "fraudulent", or "scam" in verificationStatus or evidence.
 `;
+}
+
+const CLAIM_TYPES_SET = new Set<string>(["audit", "partner", "sponsor", "ecosystem", "renounced", "listing"]);
+const STATUS_SET = new Set<string>(["verified", "unverified", "contradicted", "unknown"]);
+
+function parseClaims(raw: unknown): Claim[] {
+  if (!Array.isArray(raw)) return [];
+  const out: Claim[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const type = String((item as { type?: string }).type ?? "").toLowerCase();
+    const verificationStatus = String((item as { verificationStatus?: string }).verificationStatus ?? "unknown").toLowerCase();
+    const rawClaim = String((item as { rawClaim?: string }).rawClaim ?? "").trim();
+    const evidence = String((item as { evidence?: string }).evidence ?? "").trim();
+    if (!rawClaim || !CLAIM_TYPES_SET.has(type)) continue;
+    out.push({
+      type: type as ClaimType,
+      rawClaim,
+      sourceContext: typeof (item as { sourceContext?: string }).sourceContext === "string" ? (item as { sourceContext: string }).sourceContext.trim() || undefined : undefined,
+      verificationStatus: STATUS_SET.has(verificationStatus) ? (verificationStatus as VerificationStatus) : "unknown",
+      evidence: evidence || "No evidence provided.",
+    });
+  }
+  return out;
 }
 
 /**
@@ -219,7 +267,7 @@ ${investigationSteps}
 function parseUnifiedResponse(text: string): UnifiedAnalysisResult | null {
   try {
     let jsonString = text.trim();
-    
+
     // Try to find JSON block in markdown code fence
     const jsonBlockMatch = jsonString.match(/```json\s*([\s\S]*?)\s*```/);
     if (jsonBlockMatch) {
@@ -228,14 +276,14 @@ function parseUnifiedResponse(text: string): UnifiedAnalysisResult | null {
       // Try to find JSON object directly (from first { to last })
       const firstBrace = jsonString.indexOf('{');
       const lastBrace = jsonString.lastIndexOf('}');
-      
+
       if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
         jsonString = jsonString.slice(firstBrace, lastBrace + 1);
       }
     }
-    
+
     const parsed = JSON.parse(jsonString);
-    
+
     return {
       trustScore: Math.min(100, Math.max(0, Number(parsed.trustScore) || 50)),
       verdict: parsed.verdict || "Caution",
@@ -244,6 +292,7 @@ function parseUnifiedResponse(text: string): UnifiedAnalysisResult | null {
       lies: Array.isArray(parsed.lies) ? parsed.lies : [],
       evidence: Array.isArray(parsed.evidence) ? parsed.evidence : [],
       analysis: Array.isArray(parsed.analysis) ? parsed.analysis : [],
+      claims: parseClaims(parsed.claims),
       visualAnalysis: parsed.visualAnalysis,
       degenComment: parsed.degenComment || "Assessment complete. Consider other risks outside this scan.",
     };

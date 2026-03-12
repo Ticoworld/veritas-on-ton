@@ -6,6 +6,7 @@
 
 import type { BotScanResult } from "./normalized-result";
 import type { InlineKeyboardButton } from "./telegram-api";
+import type { Claim } from "@/lib/claims";
 
 const MAX_MESSAGE_LENGTH = 4000;
 const CAPTION_MAX_LENGTH = 1024;
@@ -25,13 +26,67 @@ export function getScreenshotFullUrl(bot: BotScanResult): string | undefined {
 }
 
 /**
+ * Format Authority history section: based on Veritas records only; authority ≠ deployer; split counts.
+ */
+function formatAuthorityHistorySection(bot: BotScanResult): string {
+  const lin = bot.lineage;
+  if (!lin) return "• Insufficient history (authority not identified or no prior Veritas scans).";
+  const basis = lin.identitySource
+    ? `History is based on ${lin.identitySource.replace("_", " ")} in our records.`
+    : "History is based on prior Veritas scans only.";
+  const authorityCaveat = " Authority is the mint/freeze control address; it may not be the original deployer.";
+  const confidenceNote =
+    lin.lineageIdentityConfidence === "low"
+      ? " Identity confidence is limited; do not overstate."
+      : lin.lineageIdentityConfidence === "medium"
+        ? " Identity is inferred from one contract authority."
+        : "";
+  if (!lin.hasPriorHistory) {
+    return `• No prior launches linked to this authority in our records.\n• ${basis}${authorityCaveat}${confidenceNote}`;
+  }
+  const lines: string[] = [];
+  lines.push(`• ${basis}${authorityCaveat}${confidenceNote}`.trim());
+  lines.push(`• Among previously scanned launches in our records, this authority appears in ${lin.priorLaunchCount} prior token(s).`);
+  if (lin.priorSuspiciousOrHighRiskCount > 0) {
+    lines.push(`• Prior suspicious or high-risk (in our records): ${lin.priorSuspiciousOrHighRiskCount}.`);
+  }
+  if (lin.priorCannotVerifyCount > 0) {
+    lines.push(`• Prior scans with insufficient data (not counted as suspicious): ${lin.priorCannotVerifyCount}.`);
+  }
+  if (lin.priorSuspiciousOrHighRiskCount === 0 && lin.priorCannotVerifyCount === 0) {
+    lines.push("• No prior suspicious or high-risk history found in our records.");
+  }
+  if (lin.priorLaunches.length > 0) {
+    lin.priorLaunches.slice(0, 5).forEach((p) => {
+      const date = p.scannedAt.slice(0, 10);
+      const label = p.displayLabel;
+      lines.push(`  — ${p.tokenName} ($${p.tokenSymbol}): ${label} (${date})`);
+    });
+  }
+  return lines.join("\n");
+}
+
+/**
  * Picks 2–4 strongest, decision-relevant reasons only. No filler (e.g. "Visual evidence captured").
+ * Surfaces claim-based and lineage findings when relevant.
  */
 function strongestReasons(bot: BotScanResult): string[] {
   const reasons: string[] = [];
   if (bot.displayVerdict === "Cannot verify") {
     reasons.push(bot.summaryLine);
     return reasons;
+  }
+  if (bot.reputationSignals?.strongestReputationFinding) {
+    reasons.push(bot.reputationSignals.strongestReputationFinding);
+  }
+  if (bot.websiteDrift?.materialChangesDetected && bot.websiteDrift.strongestFinding) {
+    reasons.push(bot.websiteDrift.strongestFinding);
+  }
+  if (bot.lineage?.strongestLineageFinding && bot.lineage.lineageIdentityConfidence !== "low") {
+    reasons.push(bot.lineage.strongestLineageFinding);
+  }
+  if (bot.claimSummary) {
+    reasons.push(bot.claimSummary);
   }
   if (bot.displayVerdict === "High risk" || bot.displayVerdict === "Suspicious") {
     if (bot.onChainFindings.some((f) => f.includes("Mint authority is enabled"))) reasons.push("Mint authority enabled");
@@ -52,6 +107,72 @@ function strongestReasons(bot: BotScanResult): string[] {
   return reasons.slice(0, 4);
 }
 
+function formatWebsiteDriftSection(bot: BotScanResult): string {
+  const drift = bot.websiteDrift;
+  if (!drift) return "• Website drift unavailable for this scan.";
+  if (!drift.priorSnapshotExists) return "• No prior website snapshot in Veritas records for comparison.";
+  const lines: string[] = [];
+  const when = drift.priorScannedAt ? drift.priorScannedAt.slice(0, 10) : "unknown date";
+  const basisLabel =
+    drift.comparisonBasis === "token"
+      ? "same token (strong continuity)"
+      : drift.comparisonBasis === "domain"
+        ? "same domain (weaker continuity; domain may be reused or repointed)"
+        : "similar context";
+  lines.push(`• Compared with prior snapshot from ${when} for ${basisLabel}.`);
+  if (drift.materialChangesDetected) {
+    lines.push("• Material website trust-signal changes detected since previous scan:");
+    drift.keyChanges.slice(0, 3).forEach((c) => lines.push(`  — ${c}`));
+  } else {
+    lines.push("• No material website trust-signal changes detected since previous scan.");
+  }
+  return lines.join("\n");
+}
+
+/** Format Reputation signals section: strong vs weak; no overclaiming. */
+function formatReputationSection(bot: BotScanResult): string {
+  const rep = bot.reputationSignals;
+  if (!rep) return "• Reputation signals not available for this scan.";
+  const hasAny =
+    rep.sameDomainInPriorFlagged ||
+    rep.repeatedClaimMotif ||
+    rep.repeatedVisualPattern ||
+    rep.authorityPlusPattern;
+  if (!hasAny) {
+    return "• No repeated trust pattern found across prior scans in our records.";
+  }
+  const lines: string[] = [];
+  if (rep.authorityPlusPattern) {
+    lines.push(`• ${rep.authorityPlusPattern.patternDescription}`);
+  }
+  if (rep.sameDomainInPriorFlagged) {
+    const verdictNote =
+      rep.sameDomainInPriorFlagged.scansWithVerdictCount != null
+        ? ` (${rep.sameDomainInPriorFlagged.scansWithVerdictCount} with verdict data)`
+        : "";
+    lines.push(
+      `• Same domain (${rep.sameDomainInPriorFlagged.domain}) appeared in prior suspicious scans: ${rep.sameDomainInPriorFlagged.priorScanCount} prior scan(s), ${rep.sameDomainInPriorFlagged.priorFlaggedCount} flagged${verdictNote}.`,
+    );
+  }
+  if (rep.repeatedClaimMotif) {
+    const label =
+      rep.repeatedClaimMotif.strength === "weak"
+        ? " (weaker signal: generic claim-type repetition)"
+        : rep.repeatedClaimMotif.unsupportedContradicted
+          ? " (unsupported or contradicted claim motif)"
+          : " (repeated claim combination)";
+    lines.push(
+      `• Repeated trust-claim motif (${rep.repeatedClaimMotif.claimTypes.join(", ")}) seen in prior flagged scans: ${rep.repeatedClaimMotif.priorScanCount} prior scan(s), ${rep.repeatedClaimMotif.priorFlaggedCount} flagged${label}.`,
+    );
+  }
+  if (rep.repeatedVisualPattern) {
+    lines.push(
+      `• Similar visual trust summary in prior flagged scans: ${rep.repeatedVisualPattern.priorScanCount} prior scan(s), ${rep.repeatedVisualPattern.priorFlaggedCount} flagged (weaker signal).`,
+    );
+  }
+  return lines.join("\n");
+}
+
 /**
  * One-line visual status for the card: captured and analyzed vs not captured; strongest signal when available.
  */
@@ -66,7 +187,18 @@ function cardVisualLine(bot: BotScanResult): string {
   return "Visual: captured and analyzed — see Full Report for details";
 }
 
-/** Short verdict card for main reply (alert style). Verdict, confidence, 2–4 reasons, compact coverage, clear visual status. */
+/** Format Claims check section: claim, status, short reason. */
+function formatClaimsSection(claims: Claim[]): string {
+  if (!claims.length) return "• No trust claims extracted from the website.";
+  return claims
+    .map(
+      (c) =>
+        `• [${c.type}] ${c.rawClaim.slice(0, 60)}${c.rawClaim.length > 60 ? "…" : ""}\n  Status: ${c.verificationStatus}. ${c.evidence.slice(0, 100)}${c.evidence.length > 100 ? "…" : ""}`
+    )
+    .join("\n\n");
+}
+
+/** Short verdict card for main reply (alert style). Verdict, confidence, 2–4 reasons (incl. claim finding when relevant), compact coverage, clear visual status. */
 export function formatVerdictCard(bot: BotScanResult): string {
   const reasons = strongestReasons(bot);
   const coverageLine = `Coverage: Visual ${bot.dataCoverage.visual} · On-chain ${bot.dataCoverage.onChain} · Market ${bot.dataCoverage.market}`;
@@ -134,6 +266,22 @@ export function formatVerdictMessage(bot: BotScanResult): string {
   }
   lines.push("");
 
+  lines.push("Claims check:");
+  lines.push(bot.claims?.length ? formatClaimsSection(bot.claims) : "• No trust claims extracted from the website.");
+  lines.push("");
+
+  lines.push("Website drift:");
+  lines.push(formatWebsiteDriftSection(bot));
+  lines.push("");
+
+  lines.push("Reputation signals:");
+  lines.push(formatReputationSection(bot));
+  lines.push("");
+
+  lines.push("Authority history:");
+  lines.push(formatAuthorityHistorySection(bot));
+  lines.push("");
+
   lines.push("Unknowns and limitations:");
   if (bot.unknowns.length > 0) {
     bot.unknowns.forEach((u) => lines.push(`• ${u}`));
@@ -156,6 +304,11 @@ export function formatFullReport(bot: BotScanResult): string {
   sections.push("");
   sections.push(`Verdict: ${bot.displayVerdict}`);
   sections.push(`Confidence: ${bot.confidenceBand}`);
+  if (bot.claimSummary) {
+    sections.push("");
+    sections.push("Claim finding:");
+    sections.push(`• ${bot.claimSummary}`);
+  }
   sections.push("");
   sections.push("Data coverage:");
   sections.push(`• Visual: ${bot.dataCoverage.visual}`);
@@ -164,6 +317,22 @@ export function formatFullReport(bot: BotScanResult): string {
   sections.push("");
   sections.push("Why this verdict:");
   sections.push(`• ${bot.summaryLine}`);
+  sections.push("");
+
+  sections.push("Claims check:");
+  sections.push(bot.claims?.length ? formatClaimsSection(bot.claims) : "• No trust claims extracted from the website.");
+  sections.push("");
+
+  sections.push("Website drift:");
+  sections.push(formatWebsiteDriftSection(bot));
+  sections.push("");
+
+  sections.push("Reputation signals:");
+  sections.push(formatReputationSection(bot));
+  sections.push("");
+
+  sections.push("Authority history:");
+  sections.push(formatAuthorityHistorySection(bot));
   sections.push("");
 
   sections.push("Visual findings:");
@@ -240,6 +409,35 @@ export function formatWhyRisky(bot: BotScanResult): string {
   if (bot.visualFindings.length > 0 && bot.visualFindings.some((f) => f.toLowerCase().includes("reuse") || f.toLowerCase().includes("copy"))) {
     lines.push("Visual:");
     bot.visualFindings.forEach((f) => lines.push(`• ${f}`));
+    lines.push("");
+  }
+
+  if (bot.claims?.length > 0) {
+    const claimRelevant = bot.claims.filter((c) => c.verificationStatus === "contradicted" || c.verificationStatus === "unverified");
+    if (claimRelevant.length > 0) {
+      lines.push("Claims check:");
+      claimRelevant.forEach((c) => {
+        const rc = c.rawClaim.length > 50 ? c.rawClaim.slice(0, 50) + "…" : c.rawClaim;
+        const ev = c.evidence.length > 60 ? c.evidence.slice(0, 60) + "…" : c.evidence;
+        lines.push(`• [${c.type}] ${c.verificationStatus}: ${rc} — ${ev}`);
+      });
+      lines.push("");
+    }
+  }
+
+  if (bot.websiteDrift?.priorSnapshotExists) {
+    lines.push("Website drift:");
+    if (bot.websiteDrift.materialChangesDetected) {
+      bot.websiteDrift.keyChanges.slice(0, 3).forEach((c) => lines.push(`• ${c}`));
+    } else {
+      lines.push("• No material website trust-signal changes detected since previous scan.");
+    }
+    lines.push("");
+  }
+
+  if (bot.lineage?.hasPriorHistory && bot.lineage.priorSuspiciousOrHighRiskCount > 0) {
+    lines.push("Authority history (based on prior Veritas scans in our records):");
+    lines.push(`• This authority appears in ${bot.lineage.priorLaunchCount} prior token(s), ${bot.lineage.priorSuspiciousOrHighRiskCount} prior suspicious or high-risk.`);
     lines.push("");
   }
 

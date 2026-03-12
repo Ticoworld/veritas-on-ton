@@ -4,6 +4,9 @@
  */
 
 import type { InvestigationResult } from "@/lib/services/VeritasInvestigator";
+import type { Claim } from "@/lib/claims";
+import type { LineageSummary, WebsiteDriftSummary, ReputationSignals } from "@/lib/db/elephant";
+import { strongestClaimSummary } from "@/lib/claims";
 
 /** Internal verdict from scan engine (unchanged). */
 export type BotVerdict = "Safe" | "Caution" | "Danger";
@@ -39,6 +42,16 @@ export interface BotScanResult {
   unknowns: string[];
   nextActions: string[];
   summaryLine: string;
+  /** Strongest claim-based finding for top-level summary when relevant */
+  claimSummary?: string;
+  /** Structured claims for Claims check section */
+  claims: Claim[];
+  /** Phase 2: Authority-linked history (prior launches linked to this authority in our records). */
+  lineage?: LineageSummary;
+  /** Phase 3: Website drift summary versus prior snapshots in Veritas records. */
+  websiteDrift?: WebsiteDriftSummary;
+  /** Phase 4: Repeated-pattern signals across prior scans. */
+  reputationSignals?: ReputationSignals;
   analysisTimeMs: number;
   dataCoverage: DataCoverage;
   /** When screenshot was saved (relative path); bot may prepend base URL. */
@@ -78,6 +91,16 @@ function computeDisplayVerdict(
   if (verdict === "Safe") return "Likely legitimate";
   if (verdict === "Caution") return "Suspicious";
   return "High risk";
+}
+
+/** Compute display verdict from full result (for lineage persistence). */
+export function getDisplayVerdictForLineage(r: InvestigationResult): DisplayVerdict {
+  const dataCoverage: DataCoverage = {
+    visual: coverageVisual(r),
+    onChain: coverageOnChain(r),
+    market: coverageMarket(r),
+  };
+  return computeDisplayVerdict(r.verdict, dataCoverage);
 }
 
 function confidenceToBand(score: number): ConfidenceBand {
@@ -228,6 +251,8 @@ export function investigationResultToBotResult(r: InvestigationResult): BotScanR
     nextActions = ["Insufficient data for a confident verdict; rescan when more sources are available or use other tools."];
   }
   const summaryLine = toProfessionalSummary(r, displayVerdict, dataCoverage);
+  const claims = r.claims ?? [];
+  const claimSummary = strongestClaimSummary(claims);
 
   return {
     verdict: r.verdict,
@@ -243,6 +268,11 @@ export function investigationResultToBotResult(r: InvestigationResult): BotScanR
     unknowns,
     nextActions,
     summaryLine,
+    claimSummary,
+    claims,
+    lineage: r.lineage,
+    websiteDrift: r.websiteDrift,
+    reputationSignals: r.reputationSignals,
     analysisTimeMs: r.analysisTimeMs,
     dataCoverage,
     screenshotPublicUrl: r.screenshotPublicUrl,

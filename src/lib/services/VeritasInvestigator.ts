@@ -18,8 +18,32 @@ import { getCreatorHistory } from "@/lib/api/historian";
 import { fetchScreenshotAsBase64 } from "@/lib/api/screenshot";
 import { fetchTonSecurity, type TonSecurityReport } from "@/lib/api/tonsecurity";
 import { runUnifiedAnalysis, type UnifiedAnalysisInput, type UnifiedAnalysisResult } from "@/lib/ai/unified-analyzer";
-import { checkKnownScammer, flagScammer, getCachedScan, saveScanResult, type ScammerRecord } from "@/lib/db/elephant";
+import { applyOnChainClaimVerification, strongestClaimSummary, type Claim } from "@/lib/claims";
+import {
+  checkKnownScammer,
+  flagScammer,
+  getCachedScan,
+  saveScanResult,
+  getLineageByDeployer,
+  saveLineageRecord,
+  buildLineageSummary,
+  getLatestWebsiteSnapshotByDomain,
+  getLatestWebsiteSnapshotByToken,
+  saveWebsiteSnapshot,
+  buildReputationSignals,
+  hashVisualSummary,
+  type ScammerRecord,
+  type LineageSummary,
+  type LineageIdentitySource,
+  type LineageIdentityConfidence,
+  type LineageDisplayVerdict,
+  type WebsiteSnapshotRecord,
+  type WebsiteDriftSummary,
+  type ReputationSignals,
+} from "@/lib/db/elephant";
+import { getDisplayVerdictForLineage } from "@/lib/bot/normalized-result";
 import { LRUCache } from "lru-cache";
+import { createHash } from "crypto";
 
 // =============================================================================
 // TYPES
@@ -45,6 +69,9 @@ export interface InvestigationResult {
 
   // Pre-composed display block for MCP agents (THE primary output)
   veritasSays: string;
+
+  // Structured claims (Phase 1: trust investigation)
+  claims: Claim[];
 
   // Degen Commentary - The Real Talk
   degenComment: string;
@@ -97,6 +124,15 @@ export interface InvestigationResult {
     previousTokens: number;
     isSerialLauncher: boolean;
   };
+
+  /** Phase 2: Authority-linked history (prior launches linked to this mint/freeze authority in our records). */
+  lineage?: LineageSummary;
+
+  /** Phase 3: Website drift summary against prior snapshots in Veritas records. */
+  websiteDrift?: WebsiteDriftSummary;
+
+  /** Phase 4: Repeated-pattern signals across prior scans (claims, domain, visual). */
+  reputationSignals?: ReputationSignals;
   
   // Social links
   socials: {
@@ -157,7 +193,7 @@ export class VeritasInvestigator {
 
     const ledgerCached = await getCachedScan(tokenAddress);
     if (ledgerCached) {
-      console.log(`[Veritas] ⚡ ThreatLedger cache hit for ${tokenAddress.slice(0, 8)} — refreshing dynamic data`);
+      console.log(`[Veritas] ⚡ ThreatLedger cache hit for ${tokenAddress.slice(0, 8)} — refreshing dynamic data and lineage`);
       const [marketData, tokenInfo] = await Promise.all([
         getMarketAnalysis(tokenAddress),
         getTokenInfo(tokenAddress),
@@ -174,6 +210,77 @@ export class VeritasInvestigator {
       } : null;
       ledgerCached.onChain.supply = supply;
       ledgerCached.onChain.decimals = tokenInfo.decimals ?? ledgerCached.onChain.decimals;
+      if (!Array.isArray(ledgerCached.claims)) ledgerCached.claims = [];
+
+      const creatorAddress = ledgerCached.creatorHistory?.creatorAddress;
+      if (creatorAddress && creatorAddress !== "Unknown") {
+        const lineageRecords = await getLineageByDeployer(creatorAddress, { excludeTokenAddress: tokenAddress });
+        const { identitySource, lineageIdentityConfidence } = this.getLineageIdentityOptions(
+          tokenInfo.mintAuthority ?? null,
+          tokenInfo.freezeAuthority ?? null,
+        );
+        ledgerCached.lineage = buildLineageSummary(creatorAddress, lineageRecords, {
+          identitySource,
+          lineageIdentityConfidence,
+        });
+      }
+      const cachedWebsite = ledgerCached.socials?.website;
+      const cachedIsRealWebsite =
+        !!cachedWebsite &&
+        String(cachedWebsite).trim() !== "" &&
+        String(cachedWebsite).trim().toLowerCase() !== "none" &&
+        !cachedWebsite.includes("t.me") &&
+        !cachedWebsite.includes("telegram.me") &&
+        !cachedWebsite.includes("x.com") &&
+        !cachedWebsite.includes("twitter.com");
+      const cachedWebsiteDomain = this.extractWebsiteDomain(cachedIsRealWebsite ? cachedWebsite : undefined);
+      if (cachedIsRealWebsite && cachedWebsiteDomain) {
+        let priorSnapshot = await getLatestWebsiteSnapshotByToken(tokenAddress);
+        let basis: "token" | "domain" | undefined;
+        if (priorSnapshot) {
+          basis = "token";
+        } else {
+          priorSnapshot = await getLatestWebsiteSnapshotByDomain(cachedWebsiteDomain, { excludeTokenAddress: tokenAddress });
+          if (priorSnapshot) basis = "domain";
+        }
+        const currentSnapshot: WebsiteSnapshotRecord = {
+          tokenAddress,
+          websiteUrl: cachedWebsite!.trim(),
+          websiteDomain: cachedWebsiteDomain,
+          scannedAt: new Date(ledgerCached.analyzedAt),
+          screenshotPublicUrl: ledgerCached.screenshotPublicUrl,
+          screenshotAvailable: ledgerCached.visualEvidenceStatus === "captured",
+          visualSummary: this.normalizeText(ledgerCached.visualEvidenceSummary),
+          claims: Array.isArray(ledgerCached.claims) ? ledgerCached.claims : [],
+          contentFingerprint: this.computeWebsiteFingerprint({
+            websiteDomain: cachedWebsiteDomain,
+            visualSummary: ledgerCached.visualEvidenceSummary,
+            claims: Array.isArray(ledgerCached.claims) ? ledgerCached.claims : [],
+            socials: ledgerCached.socials,
+            screenshotPublicUrl: ledgerCached.screenshotPublicUrl,
+          }),
+          trustSectionSummary: strongestClaimSummary(Array.isArray(ledgerCached.claims) ? ledgerCached.claims : []) ?? this.normalizeText(ledgerCached.summary).slice(0, 200),
+          socials: {
+            twitter: ledgerCached.socials?.twitter,
+            telegram: ledgerCached.socials?.telegram,
+            discord: ledgerCached.socials?.discord,
+          },
+        };
+        ledgerCached.websiteDrift = this.buildWebsiteDriftSummary(currentSnapshot, priorSnapshot, basis);
+      }
+      // Phase 4 hardening: refresh reputation on cache hit (same as lineage/drift)
+      try {
+        const cachedRep = await buildReputationSignals({
+          tokenAddress,
+          websiteDomain: cachedWebsiteDomain ?? undefined,
+          claims: Array.isArray(ledgerCached.claims) ? ledgerCached.claims : [],
+          visualSummary: this.normalizeText(ledgerCached.visualEvidenceSummary),
+        });
+        ledgerCached.reputationSignals = cachedRep;
+        this.applyAuthorityPlusPattern(ledgerCached.reputationSignals, ledgerCached.lineage);
+      } catch (e) {
+        console.warn("[Veritas] cache path buildReputationSignals failed:", e);
+      }
       return ledgerCached;
     }
 
@@ -195,7 +302,26 @@ export class VeritasInvestigator {
     }
     
     console.log("[Veritas Investigator] ✅ No prior record found. Proceeding with full analysis...");
-    
+
+    // =========================================================================
+    // AUTHORITY-LINKED HISTORY (Phase 2: prior launches linked to this authority)
+    // =========================================================================
+    const { identitySource, lineageIdentityConfidence } = this.getLineageIdentityOptions(
+      tokenInfo.mintAuthority ?? null,
+      tokenInfo.freezeAuthority ?? null,
+    );
+    let lineageSummary: LineageSummary | undefined;
+    if (creatorAddress) {
+      const lineageRecords = await getLineageByDeployer(creatorAddress, { excludeTokenAddress: tokenAddress });
+      lineageSummary = buildLineageSummary(creatorAddress, lineageRecords, {
+        identitySource,
+        lineageIdentityConfidence,
+      });
+      if (lineageSummary.hasPriorHistory) {
+        console.log(`[Veritas Investigator] 📜 Authority history: ${lineageSummary.priorLaunchCount} prior tokens in our records, ${lineageSummary.priorSuspiciousOrHighRiskCount} suspicious/high-risk`);
+      }
+    }
+
     // =========================================================================
     // PHASE 2: DATA PIPELINE (All in parallel — holders included)
     // =========================================================================
@@ -400,6 +526,73 @@ export class VeritasInvestigator {
       socials?.twitter ? `X: ${socials.twitter}` : null,
     ].filter(Boolean).join(" | ");
 
+    // Apply on-chain verification to renounced-type claims (overwrite AI status with ground truth)
+    const claims: Claim[] = applyOnChainClaimVerification(
+      Array.isArray(aiResult.claims) ? aiResult.claims : [],
+      tokenInfo.mintAuthority,
+      tokenInfo.freezeAuthority
+    );
+
+    // =========================================================================
+    // PHASE 3: WEBSITE SNAPSHOT LOOKUP + DRIFT COMPARISON
+    // =========================================================================
+    const websiteDomain = this.extractWebsiteDomain(isRealWebsite ? websiteUrl : undefined);
+    let websiteDrift: WebsiteDriftSummary | undefined;
+    let driftComparisonBasis: "token" | "domain" | undefined;
+    let priorSnapshot: WebsiteSnapshotRecord | null = null;
+
+    if (isRealWebsite && websiteDomain) {
+      priorSnapshot = await getLatestWebsiteSnapshotByToken(tokenAddress);
+      if (priorSnapshot) {
+        driftComparisonBasis = "token";
+      } else {
+        priorSnapshot = await getLatestWebsiteSnapshotByDomain(websiteDomain, {
+          excludeTokenAddress: tokenAddress,
+        });
+        if (priorSnapshot) driftComparisonBasis = "domain";
+      }
+
+      const currentSnapshot: WebsiteSnapshotRecord = {
+        tokenAddress,
+        websiteUrl: websiteUrl!.trim(),
+        websiteDomain,
+        scannedAt: new Date(),
+        screenshotPublicUrl: websiteScreenshot?.publicUrl,
+        screenshotAvailable: visualEvidenceStatus === "captured",
+        visualSummary: this.normalizeText(visualEvidenceSummary),
+        claims,
+        contentFingerprint: this.computeWebsiteFingerprint({
+          websiteDomain,
+          visualSummary: visualEvidenceSummary,
+          claims,
+          socials,
+          screenshotPublicUrl: websiteScreenshot?.publicUrl,
+        }),
+        trustSectionSummary: strongestClaimSummary(claims) ?? this.normalizeText(aiResult.summary).slice(0, 200),
+        socials: {
+          twitter: socials?.twitter,
+          telegram: socials?.telegram,
+          discord: socials?.discord,
+        },
+      };
+
+      websiteDrift = this.buildWebsiteDriftSummary(currentSnapshot, priorSnapshot, driftComparisonBasis);
+    }
+
+    // Phase 4: Reputation signals from prior scans (repeated claims, domain, visual pattern)
+    let reputationSignals: ReputationSignals | undefined;
+    try {
+      reputationSignals = await buildReputationSignals({
+        tokenAddress,
+        websiteDomain: websiteDomain ?? undefined,
+        claims,
+        visualSummary: this.normalizeText(visualEvidenceSummary),
+      });
+      this.applyAuthorityPlusPattern(reputationSignals, lineageSummary);
+    } catch (e) {
+      console.warn("[Veritas] buildReputationSignals failed:", e);
+    }
+
     const veritasSays = [
       `VERITAS FORENSIC REPORT: ${tokenName} ($${tokenSymbol})`,
       `Trust Score: ${finalScore}/100 — ${finalVerdict}`,
@@ -432,6 +625,7 @@ export class VeritasInvestigator {
       lies: aiResult.lies,
       evidence: aiResult.evidence,
       analysis: aiResult.analysis,
+      claims,
       visualAnalysis: visualAnalysisFinal,
       visualEvidenceStatus,
       visualAssetReuse,
@@ -470,6 +664,9 @@ export class VeritasInvestigator {
         previousTokens: Array.isArray(creatorHistory) ? creatorHistory.length : 0,
         isSerialLauncher: Array.isArray(creatorHistory) && creatorHistory.length >= 2,
       },
+      lineage: lineageSummary,
+      websiteDrift,
+      reputationSignals,
       socials: {
         website: socials?.website,
         twitter: socials?.twitter,
@@ -485,6 +682,67 @@ export class VeritasInvestigator {
     };
 
     await saveScanResult(tokenAddress, finalResult, "unified");
+
+    // Persist lineage record (Phase 2) when we have an authority address (mint/freeze)
+    if (creatorStatus.creatorAddress && creatorStatus.creatorAddress !== "Unknown") {
+      let websiteDomain: string | undefined;
+      if (socials?.website) {
+        try {
+          websiteDomain = new URL(socials.website).hostname;
+        } catch {
+          websiteDomain = undefined;
+        }
+      }
+      const displayVerdict: LineageDisplayVerdict = getDisplayVerdictForLineage(finalResult);
+      await saveLineageRecord({
+        deployerAddress: creatorStatus.creatorAddress,
+        tokenAddress,
+        tokenName,
+        tokenSymbol,
+        scannedAt: new Date(),
+        verdict: finalVerdict,
+        displayVerdict,
+        identitySource,
+        keyFlags: {
+          isDumped: creatorStatus.isDumped,
+          isWhale: creatorStatus.isWhale,
+          visualAssetReuse,
+        },
+        websiteDomain,
+        claimSummary: strongestClaimSummary(claims),
+      });
+    }
+
+    // Persist website snapshot for future drift comparison and Phase 4 reputation
+    if (isRealWebsite && websiteDomain) {
+      await saveWebsiteSnapshot({
+        tokenAddress,
+        websiteUrl: websiteUrl!.trim(),
+        websiteDomain,
+        scannedAt: new Date(),
+        screenshotPublicUrl: websiteScreenshot?.publicUrl,
+        screenshotAvailable: visualEvidenceStatus === "captured",
+        visualSummary: this.normalizeText(visualEvidenceSummary),
+        claims,
+        contentFingerprint: this.computeWebsiteFingerprint({
+          websiteDomain,
+          visualSummary: visualEvidenceSummary,
+          claims,
+          socials,
+          screenshotPublicUrl: websiteScreenshot?.publicUrl,
+        }),
+        trustSectionSummary: strongestClaimSummary(claims) ?? this.normalizeText(aiResult.summary).slice(0, 200),
+        socials: {
+          twitter: socials?.twitter,
+          telegram: socials?.telegram,
+          discord: socials?.discord,
+        },
+        verdictAtScan: finalVerdict,
+        displayVerdictAtScan: getDisplayVerdictForLineage(finalResult),
+        visualSummaryHash: hashVisualSummary(this.normalizeText(visualEvidenceSummary)),
+      });
+    }
+
     resultCache.set(cacheKey, finalResult);
     return finalResult;
   }
@@ -492,6 +750,30 @@ export class VeritasInvestigator {
   // ===========================================================================
   // PRIVATE HELPERS
   // ===========================================================================
+
+  /** Phase 4 hardening: when authority has prior flagged launches AND we have same domain or strong claim motif, set combined signal. */
+  private applyAuthorityPlusPattern(
+    reputationSignals: ReputationSignals | undefined,
+    lineage: LineageSummary | undefined,
+  ): void {
+    if (!reputationSignals || !lineage?.hasPriorHistory || (lineage.priorSuspiciousOrHighRiskCount ?? 0) === 0) return;
+    const hasStrongPattern =
+      reputationSignals.sameDomainInPriorFlagged ||
+      (reputationSignals.repeatedClaimMotif && reputationSignals.repeatedClaimMotif.strength === "strong");
+    if (!hasStrongPattern) return;
+    const n = lineage.priorSuspiciousOrHighRiskCount ?? 0;
+    const patternDesc =
+      reputationSignals.sameDomainInPriorFlagged && reputationSignals.repeatedClaimMotif?.strength === "strong"
+        ? "same domain and a repeated trust-claim pattern"
+        : reputationSignals.sameDomainInPriorFlagged
+          ? "same domain"
+          : "a repeated trust-claim pattern";
+    reputationSignals.authorityPlusPattern = {
+      priorFlaggedLaunches: n,
+      patternDescription: `This authority was previously linked to ${n} flagged token(s) in our records; ${patternDesc} also appears in prior flagged scans.`,
+    };
+    reputationSignals.strongestReputationFinding = reputationSignals.authorityPlusPattern.patternDescription;
+  }
 
   // ===========================================================================
   // TRUST SCORE v2 — deterministic, 7 factors, capped at 88
@@ -539,6 +821,152 @@ export class VeritasInvestigator {
 
     // Never exceed 88 (no meme coin is fully safe)
     return Math.min(88, Math.max(0, score));
+  }
+
+  private normalizeText(input: string | undefined): string {
+    return String(input ?? "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  private extractWebsiteDomain(url: string | undefined): string | undefined {
+    if (!url) return undefined;
+    try {
+      return new URL(url).hostname.toLowerCase();
+    } catch {
+      return undefined;
+    }
+  }
+
+  private computeWebsiteFingerprint(input: {
+    websiteDomain: string;
+    visualSummary: string;
+    claims: Claim[];
+    socials: { twitter?: string; telegram?: string; discord?: string } | null | undefined;
+    screenshotPublicUrl?: string;
+  }): string {
+    const claimKeys = input.claims
+      .map((c) => `${c.type}:${this.normalizeText(c.rawClaim)}`)
+      .sort()
+      .join("|");
+    const socialKey = [input.socials?.twitter, input.socials?.telegram, input.socials?.discord]
+      .map((v) => this.normalizeText(v))
+      .join("|");
+    const payload = [
+      input.websiteDomain,
+      this.normalizeText(input.visualSummary),
+      claimKeys,
+      socialKey,
+      this.normalizeText(input.screenshotPublicUrl),
+    ].join("::");
+    return createHash("sha256").update(payload).digest("hex");
+  }
+
+  private buildWebsiteDriftSummary(
+    current: WebsiteSnapshotRecord,
+    prior: WebsiteSnapshotRecord | null,
+    basis?: "token" | "domain",
+  ): WebsiteDriftSummary {
+    if (!prior) {
+      return {
+        priorSnapshotExists: false,
+        materialChangesDetected: false,
+        keyChanges: [],
+        currentWebsiteUrl: current.websiteUrl,
+      };
+    }
+
+    const changes: string[] = [];
+    const currentClaims = new Set(current.claims.map((c) => `${c.type}:${this.normalizeText(c.rawClaim)}`));
+    const priorClaims = new Set((prior.claims ?? []).map((c) => `${c.type}:${this.normalizeText(c.rawClaim)}`));
+
+    const addedClaims = [...currentClaims].filter((k) => !priorClaims.has(k));
+    const removedClaims = [...priorClaims].filter((k) => !currentClaims.has(k));
+    const claimTypeLabel = (k: string) => k.split(":")[0] ?? "claim";
+    if (addedClaims.length > 0) {
+      const topAdded = addedClaims.slice(0, 2).map(claimTypeLabel).join(", ");
+      changes.push(`Website claims added since previous scan: ${topAdded}.`);
+    }
+    if (removedClaims.length > 0) {
+      const topRemoved = removedClaims.slice(0, 2).map(claimTypeLabel).join(", ");
+      changes.push(`Website claims removed since previous scan: ${topRemoved}.`);
+    }
+
+    const socialPairs: Array<["twitter" | "telegram" | "discord", string | undefined, string | undefined]> = [
+      ["twitter", current.socials?.twitter, prior.socials?.twitter],
+      ["telegram", current.socials?.telegram, prior.socials?.telegram],
+      ["discord", current.socials?.discord, prior.socials?.discord],
+    ];
+    const socialChanged = socialPairs
+      .filter(([, curr, prev]) => this.normalizeText(curr) !== this.normalizeText(prev))
+      .map(([name]) => name);
+    if (socialChanged.length > 0) {
+      changes.push(`Social links changed since previous scan: ${socialChanged.join(", ")}.`);
+    }
+
+    const screenshotStateChanged = current.screenshotAvailable !== prior.screenshotAvailable;
+    if (screenshotStateChanged) {
+      changes.push(
+        current.screenshotAvailable
+          ? "Screenshot available now but was unavailable in previous scan."
+          : "Screenshot unavailable now but was available in previous scan.",
+      );
+    }
+
+    const visualChanged = this.normalizeText(current.visualSummary) !== this.normalizeText(prior.visualSummary);
+    if (visualChanged) {
+      changes.push("Visual trust section changed materially since previous scan.");
+    }
+
+    const fingerprintChanged =
+      !!current.contentFingerprint &&
+      !!prior.contentFingerprint &&
+      current.contentFingerprint !== prior.contentFingerprint;
+    if (fingerprintChanged) {
+      changes.push(
+        "Technical change in page structure or branding detected since previous scan (weak signal on its own; interpret together with other changes).",
+      );
+    }
+
+    const materialChangesDetected = changes.length > 0;
+    let strongestFinding: string | undefined;
+    if (materialChangesDetected) {
+      strongestFinding = changes[0];
+    } else {
+      strongestFinding = "No material website trust-signal changes detected since previous scan.";
+    }
+
+    return {
+      priorSnapshotExists: true,
+      comparisonBasis: basis,
+      priorScannedAt: prior.scannedAt instanceof Date ? prior.scannedAt.toISOString() : String(prior.scannedAt),
+      priorWebsiteUrl: prior.websiteUrl,
+      currentWebsiteUrl: current.websiteUrl,
+      materialChangesDetected,
+      keyChanges: changes.slice(0, 3),
+      strongestFinding,
+    };
+  }
+
+  /**
+   * Derive lineage identity source and confidence from contract authority fields.
+   * Authority (mint/freeze) is not necessarily the deployer; do not overstate.
+   */
+  private getLineageIdentityOptions(
+    mintAuth: string | null,
+    freezeAuth: string | null,
+  ): { identitySource?: LineageIdentitySource; lineageIdentityConfidence: LineageIdentityConfidence } {
+    if (mintAuth && freezeAuth && mintAuth === freezeAuth) {
+      return { identitySource: "both", lineageIdentityConfidence: "high" };
+    }
+    if (mintAuth) {
+      return { identitySource: "mint_authority", lineageIdentityConfidence: "medium" };
+    }
+    if (freezeAuth) {
+      return { identitySource: "freeze_authority", lineageIdentityConfidence: "medium" };
+    }
+    return { lineageIdentityConfidence: "low" };
   }
 
   private analyzeCreator(
@@ -605,6 +1033,7 @@ export class VeritasInvestigator {
       visualEvidenceStatus: "not_captured" as const,
       visualAssetReuse: "UNKNOWN" as const,
       visualEvidenceSummary: "No visual analysis — known scammer fast-path.",
+      claims: [],
       veritasSays: [
         `VERITAS FORENSIC REPORT: ${tokenName} ($SCAM)`,
         `Trust Score: 0/100 — High risk`,
