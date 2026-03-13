@@ -14,8 +14,6 @@ import {
   Percent,
   Lock,
   Unlock,
-  Terminal,
-  Brain,
 } from "lucide-react";
 import { TonConnectButton } from "@tonconnect/ui-react";
 
@@ -106,6 +104,7 @@ interface ScanResult {
   };
   visualEvidenceStatus?: "captured" | "not_captured";
   visualAssetReuse?: "YES" | "NO" | "UNKNOWN";
+  visualEvidenceSummary?: string;
   elephantMemory: {
     isKnownScammer: boolean;
     previousFlags?: ScammerRecord;
@@ -490,6 +489,46 @@ const cardStyle = {
   borderColor: "var(--tg-theme-hint-color, #27272A)",
 };
 
+/** Readable body text (dark theme). */
+const textPrimary = "var(--tg-theme-text-color, #E4E4E7)";
+const textSecondary = "var(--tg-theme-hint-color, #A1A1AA)";
+const textMuted = "var(--tg-theme-hint-color, #71717A)";
+
+/** One-line visual summary for main surface. */
+function getShortVisualSummary(result: ScanResult): string | null {
+  const raw = result.visualEvidenceSummary ?? result.visualAnalysis ?? "";
+  if (!raw.trim()) return result.visualEvidenceStatus === "captured" ? "Visual analysis inconclusive." : null;
+  if (/VISUAL ASSET REUSE:\s*YES/i.test(raw) && !/meme culture|pepe|wojak|doge|thematic|standard for/i.test(raw)) return "Suspicious trust-signal reuse detected.";
+  if (/VISUAL ASSET REUSE:\s*NO/i.test(raw) || /no major visual deception|no suspicious|branding appears original/i.test(raw)) return "No major visual deception detected.";
+  if (/inconclusive|could not be determined/i.test(raw)) return "Visual analysis inconclusive.";
+  return "Visual review complete. See Details for full analysis.";
+}
+
+/** Short, serious assessment line (no meme/shill). */
+function getAssessmentLine(comment: string): string {
+  if (!comment?.trim()) return "Assessment complete. Other risks remain outside this scan.";
+  const t = comment.replace(/\s+/g, " ").trim();
+  if (t.length <= 140) return t;
+  return t.slice(0, 137) + "...";
+}
+
+function hasMeaningfulDrift(drift: ScanResult["websiteDrift"]): boolean {
+  return !!drift?.priorSnapshotExists && (drift.materialChangesDetected || (drift.keyChanges?.length ?? 0) > 0);
+}
+
+function hasMeaningfulReputation(rep: ScanResult["reputationSignals"]): boolean {
+  return !!(
+    rep?.sameDomainInPriorFlagged ||
+    rep?.repeatedClaimMotif ||
+    rep?.repeatedVisualPattern ||
+    rep?.authorityPlusPattern
+  );
+}
+
+function hasMeaningfulLineage(lineage: ScanResult["lineage"]): boolean {
+  return !!lineage?.hasPriorHistory;
+}
+
 function SlowVision({
   result,
   copied,
@@ -509,19 +548,15 @@ function SlowVision({
         <div className="flex items-center gap-2">
           <VerdictBadge verdict={result.verdict} isKnownScammer={result.elephantMemory?.isKnownScammer} />
         </div>
-        <span className="text-[10px] font-mono" style={{ color: "var(--tg-theme-hint-color)" }}>
+        <span className="text-[10px] font-mono" style={{ color: textSecondary }}>
           {(result.analysisTimeMs / 1000).toFixed(1)}s
         </span>
       </div>
       <div className="p-5 space-y-4">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-mono" style={{ color: "var(--tg-theme-hint-color)" }}>Trust score</span>
-          <span className="font-mono font-medium" style={{ color: "var(--tg-theme-text-color)" }}>{result.trustScore}/100</span>
-        </div>
         {(result.reputationSignals?.strongestReputationFinding || (result.websiteDrift?.materialChangesDetected && result.websiteDrift?.strongestFinding) || (result.lineage?.lineageIdentityConfidence !== "low" && result.lineage?.strongestLineageFinding) || strongestClaimSummary(result.claims ?? [])) && (
           <div className="rounded border p-2.5" style={{ ...cardStyle, borderColor: "var(--tg-theme-hint-color, #27272A)" }}>
-            <span className="text-[10px] font-mono uppercase" style={{ color: "var(--tg-theme-hint-color)" }}>Finding</span>
-            <p className="mt-0.5 text-xs font-mono" style={{ color: "var(--tg-theme-text-color)" }}>
+            <span className="text-[10px] font-mono uppercase" style={{ color: textSecondary }}>Finding</span>
+            <p className="mt-0.5 text-xs font-mono leading-relaxed" style={{ color: textPrimary }}>
               {result.reputationSignals?.strongestReputationFinding
                 ?? (result.websiteDrift?.materialChangesDetected && result.websiteDrift?.strongestFinding
                   ? result.websiteDrift.strongestFinding
@@ -533,189 +568,128 @@ function SlowVision({
         )}
         {(result.evidence?.length > 0 || result.analysis?.length > 0) && (
           <div>
-            <span className="text-[10px] font-mono uppercase" style={{ color: "var(--tg-theme-hint-color)" }}>Top reasons</span>
+            <span className="text-[10px] font-mono uppercase" style={{ color: textSecondary }}>Why</span>
             <ul className="mt-1 space-y-0.5">
               {(result.evidence?.length ? result.evidence : result.analysis)?.slice(0, 3).map((line, i) => (
-                <li key={i} className="text-xs font-mono" style={{ color: "var(--tg-theme-text-color)" }}>• {line}</li>
+                <li key={i} className="text-xs font-mono" style={{ color: textPrimary }}>• {line}</li>
               ))}
             </ul>
           </div>
         )}
+        <p className="text-sm font-mono leading-relaxed" style={{ color: textPrimary }}>
+          {getAssessmentLine(result.degenComment)}
+        </p>
         {(result.visualEvidenceStatus === "not_captured" || !result.market || result.market.liquidity === 0) && (
-          <p className="text-[10px] font-mono" style={{ color: "var(--tg-theme-hint-color)" }}>
+          <p className="text-[10px] font-mono" style={{ color: textSecondary }}>
             Limitations: {[result.visualEvidenceStatus === "not_captured" && "Visual not captured", (!result.market || result.market.liquidity === 0) && "Limited market data"].filter(Boolean).join("; ")}
           </p>
         )}
-        <h2 className="text-sm font-medium" style={{ color: "var(--tg-theme-text-color)" }}>{result.criminalProfile}</h2>
-        <p className="text-sm leading-relaxed" style={{ color: "var(--tg-theme-hint-color, #A1A1AA)" }}>{result.summary}</p>
-        {result.thoughtSummary && (
-          <details className="pt-4 border-t group" style={borderStyle}>
-            <summary className="flex items-center gap-2 cursor-pointer list-none text-xs font-mono uppercase" style={{ color: "var(--tg-theme-hint-color)" }}>
-              <Brain className="w-3.5 h-3.5" /> Reasoning Trace <span className="group-open:hidden">▶</span><span className="hidden group-open:inline">▼</span>
-            </summary>
-            <p className="mt-3 text-sm font-mono whitespace-pre-wrap" style={{ color: "var(--tg-theme-hint-color, #A1A1AA)" }}>{result.thoughtSummary}</p>
-          </details>
-        )}
-        <div className="rounded border p-3" style={cardStyle}>
-          <div className="flex items-center gap-2 mb-2">
-            <Terminal className="w-4 h-4" style={{ color: "var(--tg-theme-link-color, #22C55E)" }} />
-            <span className="text-xs font-mono uppercase" style={{ color: "var(--tg-theme-link-color, #22C55E)" }}>Assessment</span>
-          </div>
-          <p className="font-mono text-sm leading-relaxed" style={{ color: "var(--tg-theme-text-color)" }}>{result.degenComment}</p>
-        </div>
-        {(result.visualEvidenceStatus || result.visualAnalysis) && (
-          <div className="rounded border p-3" style={cardStyle}>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-[10px] font-mono uppercase" style={{ color: "var(--tg-theme-hint-color)" }}>AI Vision</span>
-            </div>
-            <p className="text-xs font-mono whitespace-pre-wrap" style={{ color: "var(--tg-theme-hint-color, #A1A1AA)" }}>
-              {result.visualAnalysis ?? "No visual analysis."}
-            </p>
-          </div>
-        )}
-        {result.websiteDrift && (
-          <div className="rounded border p-3" style={cardStyle}>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10px] font-mono uppercase" style={{ color: "var(--tg-theme-hint-color)" }}>Website drift</span>
-            </div>
-            {!result.websiteDrift.priorSnapshotExists ? (
-              <p className="text-xs font-mono" style={{ color: "var(--tg-theme-hint-color, #71717A)" }}>
-                No prior website snapshot in Veritas records for comparison.
-              </p>
-            ) : (
-              <>
-                <p className="text-xs font-mono" style={{ color: "var(--tg-theme-text-color)" }}>
-                  Compared with prior snapshot from {result.websiteDrift.priorScannedAt?.slice(0, 10) ?? "unknown date"}{" "}
-                  {result.websiteDrift.comparisonBasis === "token"
-                    ? "(same token — strong continuity)."
-                    : result.websiteDrift.comparisonBasis === "domain"
-                      ? "(same domain — weaker continuity; domain may be reused or repointed)."
-                      : "(similar context)."}
-                  {result.websiteDrift.materialChangesDetected
-                    ? " Material website trust-signal changes detected:"
-                    : " No material website trust-signal changes detected."}
-                </p>
-                {result.websiteDrift.keyChanges.length > 0 && (
-                  <ul className="mt-2 space-y-1">
-                    {result.websiteDrift.keyChanges.slice(0, 3).map((c, i) => (
-                      <li key={i} className="text-[10px] font-mono" style={{ color: "var(--tg-theme-hint-color, #71717A)" }}>
-                        {c}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </>
-            )}
-          </div>
-        )}
-        {result.reputationSignals != null && (
-          <div className="rounded border p-3" style={cardStyle}>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10px] font-mono uppercase" style={{ color: "var(--tg-theme-hint-color)" }}>Reputation signals</span>
-            </div>
-            {!result.reputationSignals?.sameDomainInPriorFlagged && !result.reputationSignals?.repeatedClaimMotif && !result.reputationSignals?.repeatedVisualPattern && !result.reputationSignals?.authorityPlusPattern ? (
-              <p className="text-xs font-mono" style={{ color: "var(--tg-theme-hint-color, #71717A)" }}>
-                No repeated trust pattern found across prior scans in our records.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {result.reputationSignals.authorityPlusPattern && (
-                  <p className="text-xs font-mono" style={{ color: "var(--tg-theme-text-color)" }}>
-                    {result.reputationSignals.authorityPlusPattern.patternDescription}
-                  </p>
-                )}
-                {result.reputationSignals.sameDomainInPriorFlagged && (
-                  <p className="text-xs font-mono" style={{ color: "var(--tg-theme-text-color)" }}>
-                    Same domain ({result.reputationSignals.sameDomainInPriorFlagged.domain}) appeared in prior suspicious scans: {result.reputationSignals.sameDomainInPriorFlagged.priorScanCount} prior scan(s), {result.reputationSignals.sameDomainInPriorFlagged.priorFlaggedCount} flagged.
-                  </p>
-                )}
-                {result.reputationSignals.repeatedClaimMotif && (
-                  <p className="text-xs font-mono" style={{ color: result.reputationSignals.repeatedClaimMotif.strength === "weak" ? "var(--tg-theme-hint-color, #71717A)" : "var(--tg-theme-text-color)" }}>
-                    Repeated trust-claim motif ({result.reputationSignals.repeatedClaimMotif.claimTypes.join(", ")}) in prior flagged scans: {result.reputationSignals.repeatedClaimMotif.priorScanCount} prior scan(s), {result.reputationSignals.repeatedClaimMotif.priorFlaggedCount} flagged.
-                    {result.reputationSignals.repeatedClaimMotif.strength === "weak" && (
-                      <span className="block mt-0.5" style={{ color: "var(--tg-theme-hint-color, #71717A)" }}>Weaker signal: generic claim-type repetition.</span>
-                    )}
-                  </p>
-                )}
-                {result.reputationSignals.repeatedVisualPattern && (
-                  <p className="text-xs font-mono" style={{ color: "var(--tg-theme-hint-color, #71717A)" }}>
-                    Similar visual trust summary in prior flagged scans: {result.reputationSignals.repeatedVisualPattern.priorScanCount} prior scan(s), {result.reputationSignals.repeatedVisualPattern.priorFlaggedCount} flagged. Weaker signal.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-        {result.lineage != null && (
-          <div className="rounded border p-3" style={cardStyle}>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10px] font-mono uppercase" style={{ color: "var(--tg-theme-hint-color)" }}>Authority history</span>
-            </div>
-            <p className="text-[10px] font-mono mb-1.5" style={{ color: "var(--tg-theme-hint-color, #71717A)" }}>
-              Based on prior Veritas scans in our records only. Authority is the mint/freeze control address; it may not be the original deployer.
-              {result.lineage.identitySource && (
-                <> Identity: {result.lineage.identitySource.replace("_", " ")}.</>
-              )}
-              {result.lineage.lineageIdentityConfidence === "low" && (
-                <> Identity confidence limited.</>
-              )}
-            </p>
-            {result.lineage.hasPriorHistory ? (
-              <>
-                <p className="text-xs font-mono" style={{ color: "var(--tg-theme-text-color)" }}>
-                  This authority appears in {result.lineage.priorLaunchCount} prior token(s) in our records.
-                  {result.lineage.priorSuspiciousOrHighRiskCount > 0 && (
-                    <> {result.lineage.priorSuspiciousOrHighRiskCount} prior suspicious or high-risk.</>
-                  )}
-                  {result.lineage.priorCannotVerifyCount > 0 && (
-                    <> {result.lineage.priorCannotVerifyCount} prior with insufficient data (not counted as suspicious).</>
-                  )}
-                  {result.lineage.priorSuspiciousOrHighRiskCount === 0 && result.lineage.priorCannotVerifyCount === 0 && (
-                    <> No prior suspicious or high-risk history found.</>
-                  )}
-                </p>
-                {result.lineage.priorLaunches.length > 0 && (
-                  <ul className="mt-2 space-y-1">
-                    {result.lineage.priorLaunches.slice(0, 5).map((p, i) => (
-                      <li key={i} className="text-[10px] font-mono" style={{ color: "var(--tg-theme-hint-color, #71717A)" }}>
-                        {p.tokenName} (${p.tokenSymbol}) — {p.displayLabel} — {p.scannedAt.slice(0, 10)}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </>
-            ) : (
-              <p className="text-xs font-mono" style={{ color: "var(--tg-theme-hint-color, #71717A)" }}>No prior launches linked to this authority in our records.</p>
-            )}
-          </div>
+        {getShortVisualSummary(result) && (
+          <p className="text-xs font-mono" style={{ color: textSecondary }}>{getShortVisualSummary(result)}</p>
         )}
         {(result.claims?.length ?? 0) > 0 && (
           <div className="rounded border p-3" style={cardStyle}>
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10px] font-mono uppercase" style={{ color: "var(--tg-theme-hint-color)" }}>Claims check</span>
+              <span className="text-[10px] font-mono uppercase" style={{ color: textSecondary }}>Claims check</span>
             </div>
             <ul className="space-y-2">
               {(result.claims ?? []).map((c, i) => (
                 <li key={i} className="text-xs font-mono">
-                  <span style={{ color: "var(--tg-theme-text-color)" }}>{c.rawClaim.slice(0, 80)}{c.rawClaim.length > 80 ? "…" : ""}</span>
+                  <span style={{ color: textPrimary }}>{c.rawClaim.slice(0, 80)}{c.rawClaim.length > 80 ? "…" : ""}</span>
                   <span className="ml-1.5 px-1.5 py-0.5 rounded border text-[10px] uppercase" style={{
-                    borderColor: c.verificationStatus === "verified" ? "var(--tg-theme-link-color, #22C55E)" : c.verificationStatus === "contradicted" ? "var(--tg-theme-destructive-text-color, #EF4444)" : "var(--tg-theme-hint-color, #71717A)",
-                    color: c.verificationStatus === "verified" ? "var(--tg-theme-link-color, #22C55E)" : c.verificationStatus === "contradicted" ? "var(--tg-theme-destructive-text-color, #EF4444)" : "var(--tg-theme-hint-color, #A1A1AA)",
+                    borderColor: c.verificationStatus === "verified" ? "var(--tg-theme-link-color, #22C55E)" : c.verificationStatus === "contradicted" ? "var(--tg-theme-destructive-text-color, #EF4444)" : textMuted,
+                    color: c.verificationStatus === "verified" ? "var(--tg-theme-link-color, #22C55E)" : c.verificationStatus === "contradicted" ? "var(--tg-theme-destructive-text-color, #EF4444)" : textSecondary,
                   }}>{c.verificationStatus}</span>
-                  <p className="mt-0.5" style={{ color: "var(--tg-theme-hint-color, #71717A)" }}>{c.evidence.slice(0, 120)}{c.evidence.length > 120 ? "…" : ""}</p>
+                  <p className="mt-0.5" style={{ color: textSecondary }}>{c.evidence.slice(0, 120)}{c.evidence.length > 120 ? "…" : ""}</p>
                 </li>
               ))}
             </ul>
           </div>
         )}
+        {hasMeaningfulLineage(result.lineage) && result.lineage != null && (
+          <div className="rounded border p-3" style={cardStyle}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] font-mono uppercase" style={{ color: textSecondary }}>Authority history</span>
+            </div>
+            <p className="text-[10px] font-mono mb-1.5" style={{ color: textSecondary }}>
+              Based on prior Veritas scans. Authority is mint/freeze control; it may not be the deployer.
+              {result.lineage.identitySource && <> Identity: {result.lineage.identitySource.replace("_", " ")}.</>}
+              {result.lineage.lineageIdentityConfidence === "low" && <> Confidence limited.</>}
+            </p>
+            <p className="text-xs font-mono" style={{ color: textPrimary }}>
+              This authority appears in {result.lineage.priorLaunchCount} prior token(s).
+              {result.lineage.priorSuspiciousOrHighRiskCount > 0 && <> {result.lineage.priorSuspiciousOrHighRiskCount} prior suspicious or high-risk.</>}
+              {result.lineage.priorCannotVerifyCount > 0 && <> {result.lineage.priorCannotVerifyCount} prior with insufficient data.</>}
+              {result.lineage.priorSuspiciousOrHighRiskCount === 0 && result.lineage.priorCannotVerifyCount === 0 && <> No prior suspicious history found.</>}
+            </p>
+            {result.lineage.priorLaunches.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {result.lineage.priorLaunches.slice(0, 5).map((p, i) => (
+                  <li key={i} className="text-[10px] font-mono" style={{ color: textSecondary }}>
+                    {p.tokenName} (${p.tokenSymbol}) — {p.displayLabel} — {p.scannedAt.slice(0, 10)}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+        {hasMeaningfulDrift(result.websiteDrift) && result.websiteDrift && (
+          <div className="rounded border p-3" style={cardStyle}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] font-mono uppercase" style={{ color: textSecondary }}>Website drift</span>
+            </div>
+            <p className="text-xs font-mono" style={{ color: textPrimary }}>
+              Compared with prior snapshot from {result.websiteDrift.priorScannedAt?.slice(0, 10) ?? "unknown date"}{" "}
+              {result.websiteDrift.comparisonBasis === "token"
+                ? "(same token)."
+                : result.websiteDrift.comparisonBasis === "domain"
+                  ? "(same domain; may be reused)."
+                  : ""}
+              {result.websiteDrift.materialChangesDetected
+                ? " Material trust-signal changes detected."
+                : " No material changes detected."}
+            </p>
+            {result.websiteDrift.keyChanges.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {result.websiteDrift.keyChanges.slice(0, 3).map((c, i) => (
+                  <li key={i} className="text-[10px] font-mono" style={{ color: textSecondary }}>{c}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+        {hasMeaningfulReputation(result.reputationSignals) && result.reputationSignals && (
+          <div className="rounded border p-3" style={cardStyle}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] font-mono uppercase" style={{ color: textSecondary }}>Reputation signals</span>
+            </div>
+            <div className="space-y-2">
+              {result.reputationSignals.authorityPlusPattern && (
+                <p className="text-xs font-mono" style={{ color: textPrimary }}>{result.reputationSignals.authorityPlusPattern.patternDescription}</p>
+              )}
+              {result.reputationSignals.sameDomainInPriorFlagged && (
+                <p className="text-xs font-mono" style={{ color: textPrimary }}>
+                  Same domain ({result.reputationSignals.sameDomainInPriorFlagged.domain}) in prior suspicious scans: {result.reputationSignals.sameDomainInPriorFlagged.priorScanCount} prior scan(s), {result.reputationSignals.sameDomainInPriorFlagged.priorFlaggedCount} flagged.
+                </p>
+              )}
+              {result.reputationSignals.repeatedClaimMotif && (
+                <p className="text-xs font-mono" style={{ color: result.reputationSignals.repeatedClaimMotif.strength === "weak" ? textSecondary : textPrimary }}>
+                  Repeated trust-claim motif ({result.reputationSignals.repeatedClaimMotif.claimTypes.join(", ")}) in prior flagged scans.
+                  {result.reputationSignals.repeatedClaimMotif.strength === "weak" && <span className="block mt-0.5" style={{ color: textMuted }}>Weaker signal.</span>}
+                </p>
+              )}
+              {result.reputationSignals.repeatedVisualPattern && (
+                <p className="text-xs font-mono" style={{ color: textSecondary }}>Similar visual pattern in prior flagged scans. Weaker signal.</p>
+              )}
+            </div>
+          </div>
+        )}
         {result.lies && result.lies.length > 0 && !/^(none|no\s|no explicit)/i.test(result.lies[0]?.trim() ?? "") && (
           <div className="rounded border p-3" style={cardStyle}>
-            <span className="text-[10px] font-mono uppercase" style={{ color: "var(--tg-theme-hint-color)" }}>Lies Detected</span>
+            <span className="text-[10px] font-mono uppercase" style={{ color: textSecondary }}>Contradictions</span>
             <ul className="mt-1.5 space-y-1">
               {result.lies.slice(0, 3).map((lie, i) => (
-                <li key={i} className="text-xs font-mono flex items-start gap-2" style={{ color: "var(--tg-theme-destructive-text-color, #FCA5A5)" }}>
-                  <span>×</span><span>{lie}</span>
-                </li>
+                <li key={i} className="text-xs font-mono flex items-start gap-2" style={{ color: "var(--tg-theme-destructive-text-color, #FCA5A5)" }}><span>×</span><span>{lie}</span></li>
               ))}
             </ul>
           </div>
@@ -724,33 +698,59 @@ function SlowVision({
           type="button"
           onClick={() => setShowDetails(!showDetails)}
           className="w-full py-1.5 text-[10px] font-mono uppercase tracking-widest border-t"
-          style={{ color: "var(--tg-theme-hint-color)", ...borderStyle }}
+          style={{ color: textSecondary, ...borderStyle }}
         >
-          {showDetails ? "Hide Details ▲" : "Details ▼"}
+          {showDetails ? "Hide details" : "Details"}
         </button>
         {showDetails && (
-          <div className="space-y-3 pt-1">
-            <div className="grid grid-cols-2 gap-2">
-              <MetricCard icon={<Shield className="w-3.5 h-3.5" />} label="Trust" value={`${result.trustScore}/100`} status={getTrustStatus(result.trustScore)} />
+          <div className="space-y-3 pt-1 border-t" style={borderStyle}>
+            <div className="grid grid-cols-2 gap-2 pt-3">
+              <MetricCard icon={<Shield className="w-3.5 h-3.5" />} label="Trust score" value={`${result.trustScore}/100`} status={getTrustStatus(result.trustScore)} />
               <MetricCard icon={<TrendingUp className="w-3.5 h-3.5" />} label="Market Cap" value={`$${formatNumber(result.market?.marketCap ?? 0)}`} />
               <MetricCard icon={<Percent className="w-3.5 h-3.5" />} label="Top 10%" value={`${result.onChain.top10Percentage.toFixed(1)}%`} status={result.onChain.top10Percentage > 60 ? "danger" : "safe"} />
               <MetricCard icon={<Bot className="w-3.5 h-3.5" />} label="Bots" value={result.market?.botActivity ?? "N/A"} />
             </div>
+            <div>
+              <span className="text-[10px] font-mono uppercase" style={{ color: textSecondary }}>Profile</span>
+              <p className="mt-0.5 text-xs font-mono" style={{ color: textPrimary }}>{result.criminalProfile}</p>
+              <p className="mt-1 text-xs font-mono leading-relaxed" style={{ color: textSecondary }}>{result.summary}</p>
+            </div>
+            {result.thoughtSummary && (
+              <details className="group">
+                <summary className="cursor-pointer list-none text-[10px] font-mono uppercase" style={{ color: textSecondary }}>Reasoning trace</summary>
+                <p className="mt-2 text-xs font-mono whitespace-pre-wrap" style={{ color: textSecondary }}>{result.thoughtSummary}</p>
+              </details>
+            )}
+            {(result.visualAnalysis ?? result.visualEvidenceSummary) && (
+              <div>
+                <span className="text-[10px] font-mono uppercase" style={{ color: textSecondary }}>AI Vision (full)</span>
+                <p className="mt-1 text-xs font-mono whitespace-pre-wrap" style={{ color: textSecondary }}>{result.visualAnalysis ?? result.visualEvidenceSummary ?? ""}</p>
+              </div>
+            )}
+            {result.websiteDrift && !hasMeaningfulDrift(result.websiteDrift) && (
+              <p className="text-[10px] font-mono" style={{ color: textMuted }}>Website drift: {result.websiteDrift.priorSnapshotExists ? "No material changes." : "No prior snapshot for comparison."}</p>
+            )}
+            {result.reputationSignals != null && !hasMeaningfulReputation(result.reputationSignals) && (
+              <p className="text-[10px] font-mono" style={{ color: textMuted }}>Reputation: No repeated trust pattern in prior scans.</p>
+            )}
+            {result.lineage != null && !hasMeaningfulLineage(result.lineage) && (
+              <p className="text-[10px] font-mono" style={{ color: textMuted }}>Authority history: No prior launches in our records.</p>
+            )}
             {result.rugCheck && result.rugCheck.risks.length > 0 && (
               <div className="rounded border p-3" style={cardStyle}>
-                <span className="text-[10px] font-mono uppercase" style={{ color: "var(--tg-theme-hint-color)" }}>Audit Risks</span>
+                <span className="text-[10px] font-mono uppercase" style={{ color: textSecondary }}>Audit risks</span>
                 <ul className="mt-1.5 space-y-1">
                   {result.rugCheck.risks.slice(0, 4).map((r, i) => (
-                    <li key={i} className="text-xs font-mono flex items-start gap-2" style={{ color: "var(--tg-theme-hint-color, #A1A1AA)" }}><span>•</span>{r.name}</li>
+                    <li key={i} className="text-xs font-mono flex items-start gap-2" style={{ color: textSecondary }}><span>•</span>{r.name}</li>
                   ))}
                 </ul>
               </div>
             )}
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-mono uppercase" style={{ color: "var(--tg-theme-hint-color)" }}>Sources:</span>
-              {result.socials?.website && <a href={result.socials.website} target="_blank" rel="noopener noreferrer" className="text-[10px] font-mono" style={{ color: "var(--tg-theme-link-color)" }}>Website ↗</a>}
-              {result.socials?.twitter && <a href={result.socials.twitter} target="_blank" rel="noopener noreferrer" className="text-[10px] font-mono" style={{ color: "var(--tg-theme-link-color)" }}>Twitter ↗</a>}
-              <span className="text-[10px] font-mono" style={{ color: "var(--tg-theme-link-color)" }}>On-chain ✓</span>
+              <span className="text-[10px] font-mono uppercase" style={{ color: textSecondary }}>Sources</span>
+              {result.socials?.website && <a href={result.socials.website} target="_blank" rel="noopener noreferrer" className="text-[10px] font-mono" style={{ color: "var(--tg-theme-link-color)" }}>Website</a>}
+              {result.socials?.twitter && <a href={result.socials.twitter} target="_blank" rel="noopener noreferrer" className="text-[10px] font-mono" style={{ color: "var(--tg-theme-link-color)" }}>Twitter</a>}
+              <span className="text-[10px] font-mono" style={{ color: textSecondary }}>On-chain</span>
             </div>
           </div>
         )}
@@ -778,7 +778,7 @@ function SlowVision({
         </div>
       </div>
       <div className="px-4 py-1.5 border-t text-center" style={borderStyle}>
-        <span className="text-[9px] font-mono" style={{ color: "var(--tg-theme-hint-color)" }}>Not financial advice. Powered by Gemini.</span>
+        <span className="text-[9px] font-mono" style={{ color: textMuted }}>Not financial advice. Veritas uses on-chain data and AI analysis.</span>
       </div>
     </div>
   );

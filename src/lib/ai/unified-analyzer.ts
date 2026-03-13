@@ -37,8 +37,8 @@ export interface UnifiedAnalysisResult {
   // Visual analysis (if screenshot provided)
   visualAnalysis?: string;
 
-  // Degen Commentary - The Real Talk
-  degenComment: string; // Short, punchy, slang-filled take with emojis
+  // Short professional assessment (no slang, no emojis)
+  degenComment: string;
 
   // Metadata
   urlsAnalyzed?: string[];
@@ -210,7 +210,7 @@ Do not overclaim. If evidence is weak, use unverified or unknown. For "renounced
     { "type": "<audit|partner|sponsor|ecosystem|renounced|listing>", "rawClaim": "<short claim text>", "sourceContext": "<optional>", "verificationStatus": "<verified|unverified|contradicted|unknown>", "evidence": "<short reason>" }
   ],
   "visualAnalysis": "${hasScreenshot ? "MANDATORY: Start with 'VISUAL ASSET REUSE: YES' or 'VISUAL ASSET REUSE: NO'. Then 1-3 short forensic sentences only (no page-structure narration)." : ""}",
-  "degenComment": "<One short, professional takeaway. No slang, no emojis. E.g. 'On-chain and visual checks support a lower-risk assessment; other risks remain outside this scan.'>"
+  "degenComment": "<One short, security-grade takeaway. Concise. No slang, no emojis, no hype. E.g. 'On-chain and visual checks support a lower-risk read; other risks remain outside this scan.' or 'Multiple risk factors; treat as high risk.'>"
 }
 
 # SCORING RULES (trustScore must respect these caps)
@@ -294,7 +294,7 @@ function parseUnifiedResponse(text: string): UnifiedAnalysisResult | null {
       analysis: Array.isArray(parsed.analysis) ? parsed.analysis : [],
       claims: parseClaims(parsed.claims),
       visualAnalysis: parsed.visualAnalysis,
-      degenComment: parsed.degenComment || "Assessment complete. Consider other risks outside this scan.",
+      degenComment: parsed.degenComment || "Assessment complete. Other risks remain outside this scan.",
     };
   } catch (error) {
     console.error("[Unified Analyzer] Failed to parse response:", error);

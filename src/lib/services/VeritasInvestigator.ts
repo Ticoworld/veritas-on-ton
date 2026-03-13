@@ -73,7 +73,7 @@ export interface InvestigationResult {
   // Structured claims (Phase 1: trust investigation)
   claims: Claim[];
 
-  // Degen Commentary - The Real Talk
+  /** Short professional assessment (no hype). */
   degenComment: string;
   
   /** Thought summary from Gemini (Reasoning Trace for UI) */
