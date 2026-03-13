@@ -568,6 +568,8 @@ function getShortVisualSummary(result: ScanResult): string | null {
 const SHILL_PATTERN = /\b(frens|wen\b|gm\b|ser\b|ngmi|wagmi|degen|shill|aping|ape in|moon|mooning|based|clean as a|culture king|real deal|sending it|let'?s go|LFG\b|anon\b|fren\b|bro\b|chad\b|based af|king\b|whistl|whistle|top-tier find|gem\b|alpha\b)\b/i;
 
 function buildCleanAssessment(result: ScanResult): string {
+  if (result.verdict === "Caution") return "Some risk indicators present. Review the findings before any exposure.";
+  if (result.verdict === "Danger") return "Multiple risk factors identified. Treat as high risk and do not invest.";
   const raw = (result.degenComment ?? "").replace(/\s+/g, " ").trim();
   const isShill = !raw || SHILL_PATTERN.test(raw) || /[🚀🔥💎🙏😤🤙]/.test(raw);
   if (isShill) {
@@ -618,6 +620,23 @@ function profileLabelForVerdict(verdict: string): string | null {
 function summaryForVerdict(verdict: string): string | null {
   if (verdict === "Caution") return "Some risk indicators present. Review the findings before any exposure.";
   if (verdict === "Danger") return "Multiple risk factors identified. Treat as high risk.";
+  return null;
+}
+
+/** Verdict-first: when Caution/Danger, "Why" bullets must not contradict verdict (no lower-risk / high transparency). */
+function whyBulletsForVerdict(verdict: string): string[] | null {
+  if (verdict === "Caution") {
+    return [
+      "Some trust claims could not be independently verified in this scan.",
+      "Review unverified claims and findings before any exposure.",
+    ];
+  }
+  if (verdict === "Danger") {
+    return [
+      "Multiple risk factors or unverified trust claims identified.",
+      "Do not rely on this project for investment; treat as high risk.",
+    ];
+  }
   return null;
 }
 
@@ -675,11 +694,11 @@ function SlowVision({
             </p>
           </div>
         )}
-        {(result.evidence?.length > 0 || result.analysis?.length > 0) && (
+        {((result.evidence?.length > 0 || result.analysis?.length > 0) || whyBulletsForVerdict(result.verdict)) && (
           <div>
             <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: textSecondary }}>Why</span>
             <ul className="mt-1 space-y-0.5">
-              {(result.evidence?.length ? result.evidence : result.analysis)?.slice(0, 3).map((line, i) => (
+              {(whyBulletsForVerdict(result.verdict) ?? (result.evidence?.length ? result.evidence : result.analysis)?.slice(0, 3) ?? []).map((line, i) => (
                 <li key={i} className="text-xs font-mono" style={{ color: textPrimary }}>• {line}</li>
               ))}
             </ul>
@@ -873,7 +892,9 @@ function SlowVision({
             )}
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[10px] font-mono uppercase" style={{ color: textSecondary }}>Sources</span>
-              {result.socials?.website && <a href={result.socials.website} target="_blank" rel="noopener noreferrer" className="text-[10px] font-mono" style={{ color: "var(--tg-theme-link-color)" }}>Website</a>}
+              {(result.websiteDiscovery?.selectedWebsite ?? result.socials?.website) && (
+                <a href={result.websiteDiscovery?.selectedWebsite ?? result.socials?.website ?? "#"} target="_blank" rel="noopener noreferrer" className="text-[10px] font-mono" style={{ color: "var(--tg-theme-link-color)" }}>Website</a>
+              )}
               {result.socials?.twitter && <a href={result.socials.twitter} target="_blank" rel="noopener noreferrer" className="text-[10px] font-mono" style={{ color: "var(--tg-theme-link-color)" }}>Twitter</a>}
               <span className="text-[10px] font-mono" style={{ color: textSecondary }}>On-chain</span>
             </div>
