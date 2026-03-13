@@ -554,7 +554,7 @@ function buildCleanAssessment(result: ScanResult): string {
 function hasOverclaimingProfileSummary(text: string): boolean {
   const t = (text ?? "").replace(/\s+/g, " ").trim();
   return (
-    /\b(confirm(?:ing|s)?\s+(?:this\s+is\s+)?(?:the\s+)?legitimate/i.test(t) ||
+    /\b(?:confirm(?:ing|s)?\s+(?:this\s+is\s+)?(?:the\s+)?legitimate)/i.test(t) ||
     /\blegitimate\s+(?:ecosystem\s+)?token\b/i.test(t) ||
     /\bproves?\s+safety\b/i.test(t) ||
     /\bconfirmed\s+legitimate\b/i.test(t) ||
