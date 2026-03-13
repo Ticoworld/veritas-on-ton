@@ -199,7 +199,44 @@ export class VeritasInvestigator {
       throw new Error("Invalid token address format");
     }
 
-    const ledgerCached = await getCachedScan(tokenAddress);
+    // Bypass cache when user provides manual website override — cached result would have stale "no website" conclusions
+    const hasValidOverride =
+      !!options?.websiteOverride?.trim() &&
+      !options.websiteOverride.includes("t.me") &&
+      !options.websiteOverride.includes("telegram.me") &&
+      !options.websiteOverride.includes("x.com") &&
+      !options.websiteOverride.includes("twitter.com");
+
+    let ledgerCached = hasValidOverride ? null : await getCachedScan(tokenAddress);
+    let freshDiscoveryForCache: WebsiteDiscoveryResult | undefined;
+
+    // When cache hit: if fresh discovery would find a different website than cached, bypass cache (website-dependent AI result would be wrong)
+    if (ledgerCached) {
+      const [freshSocials, priorSnapshot] = await Promise.all([
+        getTokenSocials(tokenAddress),
+        getLatestWebsiteSnapshotByToken(tokenAddress),
+      ]);
+      freshDiscoveryForCache = discoverWebsite({
+        website: freshSocials?.website,
+        twitter: freshSocials?.twitter,
+        telegram: freshSocials?.telegram,
+        discord: freshSocials?.discord,
+        priorSnapshotUrl: priorSnapshot?.websiteUrl ?? null,
+      });
+      const cachedWebsite = ledgerCached.socials?.website;
+      const cachedHadRealWebsite =
+        !!cachedWebsite &&
+        !cachedWebsite.includes("t.me") &&
+        !cachedWebsite.includes("telegram.me") &&
+        !cachedWebsite.includes("x.com") &&
+        !cachedWebsite.includes("twitter.com");
+      const freshHasWebsite = !!freshDiscoveryForCache.selectedWebsite;
+      if (cachedHadRealWebsite !== freshHasWebsite || (cachedHadRealWebsite && freshDiscoveryForCache.selectedWebsite && cachedWebsite !== freshDiscoveryForCache.selectedWebsite)) {
+        ledgerCached = null;
+        console.log(`[Veritas] Cache bypass: website assumption changed (cached had ${cachedHadRealWebsite ? "website" : "none"}, fresh has ${freshHasWebsite ? "website" : "none"})`);
+      }
+    }
+
     if (ledgerCached) {
       console.log(`[Veritas] ⚡ ThreatLedger cache hit for ${tokenAddress.slice(0, 8)} — refreshing dynamic data and lineage`);
       const [marketData, tokenInfo] = await Promise.all([
@@ -326,6 +363,7 @@ export class VeritasInvestigator {
           console.warn("[Veritas] cache path saveLineageRecord backfill failed:", e);
         }
       }
+      if (freshDiscoveryForCache) ledgerCached.websiteDiscovery = freshDiscoveryForCache;
       return ledgerCached;
     }
 
@@ -913,8 +951,8 @@ export class VeritasInvestigator {
   /**
    * Phase 1 claim-based verdict caps: prevent false comfort when trust-theater claims are weak.
    * Strong but narrow rules:
-   * - Major contradicted/unverified audit/partner/sponsor/ecosystem claims prevent "Likely legitimate".
-   * - Multiple unverified/contradicted major claims cap at Suspicious.
+   * - Major contradicted/unverified/unknown audit/partner/sponsor/ecosystem claims prevent "Likely legitimate".
+   * - Multiple unverified/contradicted/unknown major claims cap at Suspicious.
    * - When website discovery is weak and trust claims are central, avoid "Likely legitimate".
    */
   private applyTrustDeceptionCaps(
@@ -926,18 +964,19 @@ export class VeritasInvestigator {
     const claims = Array.isArray(aiClaims) ? aiClaims : [];
     const majorTypes: Array<Claim["type"]> = ["audit", "partner", "sponsor", "ecosystem"];
     const majorClaims = claims.filter((c) => majorTypes.includes(c.type));
+    const notVerified = (s: string) => s === "unverified" || s === "contradicted" || s === "unknown";
 
     const hasMajorContradicted = majorClaims.some((c) => c.verificationStatus === "contradicted");
-    const auditUnverifiedOrContradicted = claims.some(
-      (c) => c.type === "audit" && (c.verificationStatus === "unverified" || c.verificationStatus === "contradicted"),
+    const auditNotVerified = claims.some(
+      (c) => c.type === "audit" && notVerified(c.verificationStatus),
     );
-    const partnerSponsorEcoUnverifiedOrContradicted = claims.some(
+    const partnerSponsorEcoNotVerified = claims.some(
       (c) =>
         (c.type === "partner" || c.type === "sponsor" || c.type === "ecosystem") &&
-        (c.verificationStatus === "unverified" || c.verificationStatus === "contradicted"),
+        notVerified(c.verificationStatus),
     );
     const meaningfulUnverifiedCount = majorClaims.filter(
-      (c) => c.verificationStatus === "unverified" || c.verificationStatus === "contradicted",
+      (c) => notVerified(c.verificationStatus),
     ).length;
 
     const websiteWeak =
@@ -948,10 +987,12 @@ export class VeritasInvestigator {
     if (verdict === "Safe") {
       if (
         hasMajorContradicted ||
-        auditUnverifiedOrContradicted ||
-        partnerSponsorEcoUnverifiedOrContradicted ||
+        auditNotVerified ||
+        partnerSponsorEcoNotVerified ||
         meaningfulUnverifiedCount >= 2
       ) {
+        verdict = "Caution";
+      } else if (meaningfulUnverifiedCount >= 1 && trustClaimsCentral) {
         verdict = "Caution";
       } else if (websiteWeak && trustClaimsCentral) {
         verdict = "Caution";
