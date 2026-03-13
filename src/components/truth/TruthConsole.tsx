@@ -17,9 +17,18 @@ import {
 } from "lucide-react";
 import { TonConnectButton } from "@tonconnect/ui-react";
 
-function getMainButton() {
+type MainButtonAPI = {
+  setText: (t: string) => void;
+  setParams: (p: { text?: string; color?: string; text_color?: string }) => void;
+  onClick: (cb: () => void) => void;
+  offClick: (cb: () => void) => void;
+  show: () => void;
+  hide: () => void;
+};
+
+function getMainButton(): MainButtonAPI | null {
   if (typeof window === "undefined") return null;
-  return (window as unknown as { Telegram?: { WebApp?: { MainButton?: { setText: (t: string) => void; onClick: (cb: () => void) => void; offClick: (cb: () => void) => void; show: () => void; hide: () => void } } } }).Telegram?.WebApp?.MainButton ?? null;
+  return (window as unknown as { Telegram?: { WebApp?: { MainButton?: MainButtonAPI } } }).Telegram?.WebApp?.MainButton ?? null;
 }
 import type { ScammerRecord, LineageSummary, WebsiteDriftSummary, ReputationSignals } from "@/lib/db/elephant";
 import type { Claim } from "@/lib/claims";
@@ -230,6 +239,13 @@ export function TruthConsole() {
     const MainButton = getMainButton();
     if (!MainButton) return;
     MainButton.setText("Scan Token");
+    if (typeof MainButton.setParams === "function") {
+      MainButton.setParams({
+        text: "Scan Token",
+        color: "#2d4a6f",
+        text_color: "#e2e8f0",
+      });
+    }
     const onMainClick = () => handleScanRef.current?.();
     MainButton.onClick(onMainClick);
     return () => {
@@ -315,7 +331,7 @@ export function TruthConsole() {
               {isScanning ? "…" : "Scan"}
             </button>
           </div>
-          <p className="text-xs" style={{ color: "var(--tg-theme-hint-color, #52525B)" }}>
+          <p className="text-xs" style={{ color: textSecondary }}>
             Token contract/mint address, not your wallet
           </p>
 
@@ -490,12 +506,11 @@ const cardStyle = {
 };
 
 /**
- * Contrast constants. textSecondary uses subtitle-text-color (brighter than hint-color in Telegram);
- * textMuted uses hint-color with a lighter fallback. Both are deliberately more visible than before.
+ * Contrast constants. Detail text uses brighter fallbacks for demo readability.
  */
 const textPrimary = "var(--tg-theme-text-color, #F4F4F5)";
-const textSecondary = "var(--tg-theme-subtitle-text-color, #C4C4C8)";
-const textMuted = "var(--tg-theme-hint-color, #9CA3AF)";
+const textSecondary = "var(--tg-theme-subtitle-text-color, #D1D5DB)";
+const textMuted = "var(--tg-theme-hint-color, #A8B0BC)";
 
 /** One-line visual conclusion for main surface — result-oriented, not process-oriented. */
 function getShortVisualSummary(result: ScanResult): string | null {
@@ -533,6 +548,31 @@ function buildCleanAssessment(result: ScanResult): string {
     return "No critical red flags identified in this scan. Other risks remain outside this assessment.";
   }
   return raw.length <= 160 ? raw : raw.slice(0, 157) + "…";
+}
+
+/** Overclaiming phrases that imply proof of legitimacy. Replace with careful wording. */
+function hasOverclaimingProfileSummary(text: string): boolean {
+  const t = (text ?? "").replace(/\s+/g, " ").trim();
+  return (
+    /\b(confirm(?:ing|s)?\s+(?:this\s+is\s+)?(?:the\s+)?legitimate/i.test(t) ||
+    /\blegitimate\s+(?:ecosystem\s+)?token\b/i.test(t) ||
+    /\bproves?\s+safety\b/i.test(t) ||
+    /\bconfirmed\s+legitimate\b/i.test(t) ||
+    /\bappears?\s+to\s+be\s+(?:the\s+)?legitimate\b/i.test(t) ||
+    /\blegitimate\s+project\s+token\b/i.test(t) ||
+    /\bverified\s+as\s+legitimate\b/i.test(t)
+  );
+}
+
+function sanitizeProfileSummary(text: string, verdict: string): string {
+  if (!text?.trim()) return text ?? "";
+  const t = text.replace(/\s+/g, " ").trim();
+  if (hasOverclaimingProfileSummary(t)) {
+    if (verdict === "Danger") return "Multiple risk factors identified. Treat as high risk.";
+    if (verdict === "Caution") return "Some risk indicators present. Review findings before any exposure.";
+    return "Website and on-chain data are consistent with the established project presence observed in this scan. Supports a lower-risk assessment; does not prove safety on its own.";
+  }
+  return t;
 }
 
 function hasMeaningfulDrift(drift: ScanResult["websiteDrift"]): boolean {
@@ -735,8 +775,14 @@ function SlowVision({
             </div>
             <div>
               <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: textSecondary }}>Profile</span>
-              <p className="mt-0.5 text-xs font-mono" style={{ color: textPrimary }}>{result.criminalProfile}</p>
-              <p className="mt-1 text-xs font-mono leading-relaxed" style={{ color: textPrimary }}>{result.summary}</p>
+              <p className="mt-0.5 text-xs font-mono" style={{ color: textPrimary }}>
+                {hasOverclaimingProfileSummary(result.criminalProfile)
+                  ? (result.verdict === "Safe" ? "Lower-risk profile" : result.verdict === "Caution" ? "Some risk indicators" : "High-risk profile")
+                  : result.criminalProfile}
+              </p>
+              <p className="mt-1 text-xs font-mono leading-relaxed" style={{ color: textPrimary }}>
+                {sanitizeProfileSummary(result.summary, result.verdict)}
+              </p>
             </div>
             {result.thoughtSummary && (
               <details className="group">
@@ -751,13 +797,13 @@ function SlowVision({
               </div>
             )}
             {result.websiteDrift && !hasMeaningfulDrift(result.websiteDrift) && (
-              <p className="text-[10px] font-mono" style={{ color: textMuted }}>Website drift: {result.websiteDrift.priorSnapshotExists ? "No material changes." : "No prior snapshot for comparison."}</p>
+              <p className="text-[10px] font-mono" style={{ color: textSecondary }}>Website drift: {result.websiteDrift.priorSnapshotExists ? "No material changes." : "No prior snapshot for comparison."}</p>
             )}
             {result.reputationSignals != null && !hasMeaningfulReputation(result.reputationSignals) && (
-              <p className="text-[10px] font-mono" style={{ color: textMuted }}>Reputation: No repeated trust pattern in prior scans.</p>
+              <p className="text-[10px] font-mono" style={{ color: textSecondary }}>Reputation: No repeated trust pattern in prior scans.</p>
             )}
             {result.lineage != null && !hasMeaningfulLineage(result.lineage) && (
-              <p className="text-[10px] font-mono" style={{ color: textMuted }}>Authority history: No prior launches in our records.</p>
+              <p className="text-[10px] font-mono" style={{ color: textSecondary }}>Authority history: No prior launches in our records.</p>
             )}
             {result.rugCheck && result.rugCheck.risks.length > 0 && (
               <div className="rounded border p-3" style={cardStyle}>
