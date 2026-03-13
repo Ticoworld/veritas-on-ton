@@ -364,6 +364,16 @@ export class VeritasInvestigator {
         }
       }
       if (freshDiscoveryForCache) ledgerCached.websiteDiscovery = freshDiscoveryForCache;
+      // Re-apply verdict caps: cached verdict may be stale (e.g. from before partnerSponsorEcoNotVerified cap).
+      // Ensures verdict stays consistent with current cap logic when serving from ThreatLedger cache.
+      const cachedScore = ledgerCached.trustScore ?? 50;
+      const cachedBaseVerdict =
+        cachedScore >= 70 ? "Safe" : cachedScore >= 40 ? "Caution" : "Danger";
+      ledgerCached.verdict = this.applyTrustDeceptionCaps(
+        cachedBaseVerdict,
+        Array.isArray(ledgerCached.claims) ? ledgerCached.claims : [],
+        ledgerCached.websiteDiscovery,
+      );
       return ledgerCached;
     }
 
@@ -528,7 +538,7 @@ export class VeritasInvestigator {
         ageInHours: marketData.ageInHours,
       } : undefined,
       websiteScreenshot: websiteScreenshot || undefined,
-      missingWebsiteFlag: !isRealWebsite
+      missingWebsiteFlag: !isRealWebsite || !websiteScreenshot
         ? "Flag: No Website Detected. This indicates a very high risk of a low-effort rug pull."
         : undefined,
     };
@@ -556,6 +566,13 @@ export class VeritasInvestigator {
 
     // AI can only pull DOWN, never inflate the deterministic score
     let finalScore = Math.min(deterministicScore, aiResult.trustScore);
+
+    // NO WEBSITE CAP: No usable visual verification (no URL or capture failed) = max 30, Danger
+    const noUsableWebsite = !isRealWebsite || !websiteScreenshot;
+    if (noUsableWebsite && finalScore > 30) {
+      console.log(`[Veritas Investigator] 🚨 No Website Detected (or capture failed): ${finalScore} → 30`);
+      finalScore = 30;
+    }
 
     // SCAM TEMPLATE NUKE: Only fires when we have an actual screenshot.
     // Non-meme visual asset reuse hard-caps the score at 50.

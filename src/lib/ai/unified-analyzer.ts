@@ -244,8 +244,8 @@ function parseClaims(raw: unknown): Claim[] {
   const out: Claim[] = [];
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
-    const type = String((item as { type?: string }).type ?? "").toLowerCase();
-    const verificationStatus = String((item as { verificationStatus?: string }).verificationStatus ?? "unknown").toLowerCase();
+    const type = String((item as { type?: string }).type ?? "").toLowerCase().trim();
+    const verificationStatus = String((item as { verificationStatus?: string }).verificationStatus ?? "unknown").toLowerCase().trim();
     const rawClaim = String((item as { rawClaim?: string }).rawClaim ?? "").trim();
     const evidence = String((item as { evidence?: string }).evidence ?? "").trim();
     if (!rawClaim || !CLAIM_TYPES_SET.has(type)) continue;
