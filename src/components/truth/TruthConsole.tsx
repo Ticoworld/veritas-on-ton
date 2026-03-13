@@ -440,11 +440,11 @@ function FastHUD({ result }: { result: FastResult }) {
           />
         </div>
         {m?.anomalies && m.anomalies.length > 0 && (
-          <div className="rounded p-3 border space-y-1" style={cardStyle}>
-            <span className="text-[10px] font-mono uppercase" style={{ color: "var(--tg-theme-hint-color)" }}>Anomalies</span>
+          <div className="rounded p-2.5 border space-y-1" style={{ ...cardStyle, borderColor: "var(--tg-theme-hint-color, #3F3F46)" }}>
+            <span className="text-[10px] font-mono uppercase" style={{ color: textMuted }}>Anomalies</span>
             <ul className="space-y-0.5">
               {m.anomalies.slice(0, 3).map((a, i) => (
-                <li key={i} className="text-xs font-mono" style={{ color: "var(--tg-theme-destructive-text-color, #FCD34D)" }}>• {a}</li>
+                <li key={i} className="text-xs font-mono" style={{ color: "#D4B483" }}>• {a}</li>
               ))}
             </ul>
           </div>
@@ -489,27 +489,50 @@ const cardStyle = {
   borderColor: "var(--tg-theme-hint-color, #27272A)",
 };
 
-/** Readable body text (dark theme). */
-const textPrimary = "var(--tg-theme-text-color, #E4E4E7)";
-const textSecondary = "var(--tg-theme-hint-color, #A1A1AA)";
-const textMuted = "var(--tg-theme-hint-color, #71717A)";
+/**
+ * Contrast constants. textSecondary uses subtitle-text-color (brighter than hint-color in Telegram);
+ * textMuted uses hint-color with a lighter fallback. Both are deliberately more visible than before.
+ */
+const textPrimary = "var(--tg-theme-text-color, #F4F4F5)";
+const textSecondary = "var(--tg-theme-subtitle-text-color, #C4C4C8)";
+const textMuted = "var(--tg-theme-hint-color, #9CA3AF)";
 
-/** One-line visual summary for main surface. */
+/** One-line visual conclusion for main surface — result-oriented, not process-oriented. */
 function getShortVisualSummary(result: ScanResult): string | null {
+  if (result.visualEvidenceStatus !== "captured") return null;
   const raw = result.visualEvidenceSummary ?? result.visualAnalysis ?? "";
-  if (!raw.trim()) return result.visualEvidenceStatus === "captured" ? "Visual analysis inconclusive." : null;
-  if (/VISUAL ASSET REUSE:\s*YES/i.test(raw) && !/meme culture|pepe|wojak|doge|thematic|standard for/i.test(raw)) return "Suspicious trust-signal reuse detected.";
-  if (/VISUAL ASSET REUSE:\s*NO/i.test(raw) || /no major visual deception|no suspicious|branding appears original/i.test(raw)) return "No major visual deception detected.";
+  if (/VISUAL ASSET REUSE:\s*YES/i.test(raw) && !/meme culture|pepe|wojak|doge|thematic|standard for/i.test(raw)) {
+    return "Suspicious trust-signal reuse detected.";
+  }
+  if (result.visualAssetReuse === "YES" && !/meme culture|pepe|wojak|doge|thematic|standard for/i.test(raw)) {
+    return "Suspicious trust-signal reuse detected.";
+  }
+  if (/VISUAL ASSET REUSE:\s*NO/i.test(raw) || /no major visual deception|no suspicious|branding appears original/i.test(raw) || result.visualAssetReuse === "NO") {
+    return "No major visual deception detected in this scan.";
+  }
   if (/inconclusive|could not be determined/i.test(raw)) return "Visual analysis inconclusive.";
-  return "Visual review complete. See Details for full analysis.";
+  // Derive from visualAssetReuse when raw text is generic
+  if (result.visualAssetReuse === "UNKNOWN") return "Visual analysis inconclusive.";
+  return "Visual analysis complete.";
 }
 
-/** Short, serious assessment line (no meme/shill). */
-function getAssessmentLine(comment: string): string {
-  if (!comment?.trim()) return "Assessment complete. Other risks remain outside this scan.";
-  const t = comment.replace(/\s+/g, " ").trim();
-  if (t.length <= 140) return t;
-  return t.slice(0, 137) + "...";
+/**
+ * Safe, professional assessment line for the main result surface.
+ * Detects and replaces any cached degen/shill copy with a verdict-derived fallback.
+ * Root cause: old ThreatLedger-cached scan results may still hold pre-prompt copy.
+ */
+const SHILL_PATTERN = /\b(frens|wen\b|gm\b|ser\b|ngmi|wagmi|degen|shill|aping|ape in|moon|mooning|based|clean as a|culture king|real deal|sending it|let'?s go|LFG\b|anon\b|fren\b|bro\b|chad\b|based af|king\b|whistl|whistle|top-tier find|gem\b|alpha\b)\b/i;
+
+function buildCleanAssessment(result: ScanResult): string {
+  const raw = (result.degenComment ?? "").replace(/\s+/g, " ").trim();
+  const isShill = !raw || SHILL_PATTERN.test(raw) || /[🚀🔥💎🙏😤🤙]/.test(raw);
+  if (isShill) {
+    if (result.elephantMemory?.isKnownScammer) return "Authority previously flagged. Do not interact.";
+    if (result.verdict === "Danger") return "Multiple risk factors identified. Treat as high risk and do not invest.";
+    if (result.verdict === "Caution") return "Some risk indicators present. Review the findings before any exposure.";
+    return "No critical red flags identified in this scan. Other risks remain outside this assessment.";
+  }
+  return raw.length <= 160 ? raw : raw.slice(0, 157) + "…";
 }
 
 function hasMeaningfulDrift(drift: ScanResult["websiteDrift"]): boolean {
@@ -552,10 +575,10 @@ function SlowVision({
           {(result.analysisTimeMs / 1000).toFixed(1)}s
         </span>
       </div>
-      <div className="p-5 space-y-4">
+      <div className="p-4 space-y-3">
         {(result.reputationSignals?.strongestReputationFinding || (result.websiteDrift?.materialChangesDetected && result.websiteDrift?.strongestFinding) || (result.lineage?.lineageIdentityConfidence !== "low" && result.lineage?.strongestLineageFinding) || strongestClaimSummary(result.claims ?? [])) && (
           <div className="rounded border p-2.5" style={{ ...cardStyle, borderColor: "var(--tg-theme-hint-color, #27272A)" }}>
-            <span className="text-[10px] font-mono uppercase" style={{ color: textSecondary }}>Finding</span>
+            <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: textSecondary }}>Finding</span>
             <p className="mt-0.5 text-xs font-mono leading-relaxed" style={{ color: textPrimary }}>
               {result.reputationSignals?.strongestReputationFinding
                 ?? (result.websiteDrift?.materialChangesDetected && result.websiteDrift?.strongestFinding
@@ -568,7 +591,7 @@ function SlowVision({
         )}
         {(result.evidence?.length > 0 || result.analysis?.length > 0) && (
           <div>
-            <span className="text-[10px] font-mono uppercase" style={{ color: textSecondary }}>Why</span>
+            <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: textSecondary }}>Why</span>
             <ul className="mt-1 space-y-0.5">
               {(result.evidence?.length ? result.evidence : result.analysis)?.slice(0, 3).map((line, i) => (
                 <li key={i} className="text-xs font-mono" style={{ color: textPrimary }}>• {line}</li>
@@ -576,8 +599,8 @@ function SlowVision({
             </ul>
           </div>
         )}
-        <p className="text-sm font-mono leading-relaxed" style={{ color: textPrimary }}>
-          {getAssessmentLine(result.degenComment)}
+        <p className="text-xs font-mono leading-relaxed" style={{ color: textPrimary }}>
+          {buildCleanAssessment(result)}
         </p>
         {(result.visualEvidenceStatus === "not_captured" || !result.market || result.market.liquidity === 0) && (
           <p className="text-[10px] font-mono" style={{ color: textSecondary }}>
@@ -698,7 +721,7 @@ function SlowVision({
           type="button"
           onClick={() => setShowDetails(!showDetails)}
           className="w-full py-1.5 text-[10px] font-mono uppercase tracking-widest border-t"
-          style={{ color: textSecondary, ...borderStyle }}
+          style={{ color: textPrimary, ...borderStyle }}
         >
           {showDetails ? "Hide details" : "Details"}
         </button>
@@ -711,20 +734,20 @@ function SlowVision({
               <MetricCard icon={<Bot className="w-3.5 h-3.5" />} label="Bots" value={result.market?.botActivity ?? "N/A"} />
             </div>
             <div>
-              <span className="text-[10px] font-mono uppercase" style={{ color: textSecondary }}>Profile</span>
+              <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: textSecondary }}>Profile</span>
               <p className="mt-0.5 text-xs font-mono" style={{ color: textPrimary }}>{result.criminalProfile}</p>
-              <p className="mt-1 text-xs font-mono leading-relaxed" style={{ color: textSecondary }}>{result.summary}</p>
+              <p className="mt-1 text-xs font-mono leading-relaxed" style={{ color: textPrimary }}>{result.summary}</p>
             </div>
             {result.thoughtSummary && (
               <details className="group">
-                <summary className="cursor-pointer list-none text-[10px] font-mono uppercase" style={{ color: textSecondary }}>Reasoning trace</summary>
-                <p className="mt-2 text-xs font-mono whitespace-pre-wrap" style={{ color: textSecondary }}>{result.thoughtSummary}</p>
+                <summary className="cursor-pointer list-none text-[10px] font-mono uppercase tracking-wider" style={{ color: textSecondary }}>Reasoning trace</summary>
+                <p className="mt-2 text-xs font-mono whitespace-pre-wrap leading-relaxed" style={{ color: textPrimary }}>{result.thoughtSummary}</p>
               </details>
             )}
             {(result.visualAnalysis ?? result.visualEvidenceSummary) && (
               <div>
-                <span className="text-[10px] font-mono uppercase" style={{ color: textSecondary }}>AI Vision (full)</span>
-                <p className="mt-1 text-xs font-mono whitespace-pre-wrap" style={{ color: textSecondary }}>{result.visualAnalysis ?? result.visualEvidenceSummary ?? ""}</p>
+                <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: textSecondary }}>AI Vision (full)</span>
+                <p className="mt-1 text-xs font-mono whitespace-pre-wrap leading-relaxed" style={{ color: textPrimary }}>{result.visualAnalysis ?? result.visualEvidenceSummary ?? ""}</p>
               </div>
             )}
             {result.websiteDrift && !hasMeaningfulDrift(result.websiteDrift) && (
@@ -778,7 +801,7 @@ function SlowVision({
         </div>
       </div>
       <div className="px-4 py-1.5 border-t text-center" style={borderStyle}>
-        <span className="text-[9px] font-mono" style={{ color: textMuted }}>Not financial advice. Veritas uses on-chain data and AI analysis.</span>
+        <span className="text-[9px] font-mono" style={{ color: textSecondary }}>Not financial advice. Veritas uses on-chain data and AI analysis.</span>
       </div>
     </div>
   );
