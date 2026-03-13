@@ -409,6 +409,8 @@ export class VeritasInvestigator {
           websiteDiscovery.status === "no_site_found" || websiteDiscovery.status === "social_only"
             ? "site_found_low_confidence"
             : websiteDiscovery.status;
+        (websiteDiscovery as { statusReason?: string }).statusReason =
+          "User-provided website URL was used for this scan; discovery from metadata may have missed the official site.";
       }
     }
 
@@ -530,8 +532,14 @@ export class VeritasInvestigator {
       finalScore = 50;
     }
 
-    const finalVerdict: "Safe" | "Caution" | "Danger" =
+    // Map score to base verdict, then apply narrow, rule-based caps for trust-deception cases.
+    const baseVerdict: "Safe" | "Caution" | "Danger" =
       finalScore >= 70 ? "Safe" : finalScore >= 40 ? "Caution" : "Danger";
+    const finalVerdict = this.applyTrustDeceptionCaps(
+      baseVerdict,
+      Array.isArray(aiResult.claims) ? (aiResult.claims as Claim[]) : [],
+      websiteDiscovery,
+    );
 
     console.log(
       `[Veritas Investigator] 🎯 Deterministic: ${deterministicScore} | AI: ${aiResult.trustScore} | Final: ${finalScore} (${finalVerdict})`
@@ -563,9 +571,9 @@ export class VeritasInvestigator {
         ? `Possible scam template reuse detected. ${rawVisual.replace(/.*VISUAL ASSET REUSE:\s*YES\.?\s*/i, "").trim().slice(0, 100)}`
         : `No major visual deception detected. Branding appears original in this scan. ${rawVisual.replace(/.*VISUAL ASSET REUSE:\s*NO\.?\s*/i, "").trim().slice(0, 80)}`
       : !websiteUrl
-      ? "No website — visual forensics not applicable."
+      ? "No official project website was discovered from current metadata; visual forensics are limited in this scan."
       : !isRealWebsite
-      ? "Social/redirect URL — no screenshot captured."
+      ? "Social/redirect URL — no screenshot captured; visual forensics limited."
       : "Screenshot failed — visual forensics unavailable.";
 
     const visualAnalysisFinal = rawVisual
@@ -575,9 +583,9 @@ export class VeritasInvestigator {
             ? "VISUAL ASSET REUSE: NO. No major visual deception detected. Branding appears original in this scan. No suspicious trust-badge or partner-claim reuse observed."
             : "Visual analysis performed; asset reuse could not be determined. See full report for details.")
       : !websiteUrl
-      ? "No website found. Visual analysis could not be performed."
+      ? "No official project website was discovered from current metadata, so full visual analysis could not be performed."
       : !isRealWebsite
-      ? `Website URL appears to be a social media or redirect link. No screenshot was captured.`
+      ? "Website URL appears to be a social media or redirect link. No screenshot was captured; visual analysis is limited."
       : "Screenshot capture failed. Visual analysis could not be performed.";
 
     // =========================================================================
@@ -900,6 +908,57 @@ export class VeritasInvestigator {
 
     // Never exceed 88 (no meme coin is fully safe)
     return Math.min(88, Math.max(0, score));
+  }
+
+  /**
+   * Phase 1 claim-based verdict caps: prevent false comfort when trust-theater claims are weak.
+   * Strong but narrow rules:
+   * - Major contradicted/unverified audit/partner/sponsor/ecosystem claims prevent "Likely legitimate".
+   * - Multiple unverified/contradicted major claims cap at Suspicious.
+   * - When website discovery is weak and trust claims are central, avoid "Likely legitimate".
+   */
+  private applyTrustDeceptionCaps(
+    baseVerdict: "Safe" | "Caution" | "Danger",
+    aiClaims: Claim[],
+    websiteDiscovery: WebsiteDiscoveryResult | undefined,
+  ): "Safe" | "Caution" | "Danger" {
+    let verdict = baseVerdict;
+    const claims = Array.isArray(aiClaims) ? aiClaims : [];
+    const majorTypes: Array<Claim["type"]> = ["audit", "partner", "sponsor", "ecosystem"];
+    const majorClaims = claims.filter((c) => majorTypes.includes(c.type));
+
+    const hasMajorContradicted = majorClaims.some((c) => c.verificationStatus === "contradicted");
+    const auditUnverifiedOrContradicted = claims.some(
+      (c) => c.type === "audit" && (c.verificationStatus === "unverified" || c.verificationStatus === "contradicted"),
+    );
+    const partnerSponsorEcoUnverifiedOrContradicted = claims.some(
+      (c) =>
+        (c.type === "partner" || c.type === "sponsor" || c.type === "ecosystem") &&
+        (c.verificationStatus === "unverified" || c.verificationStatus === "contradicted"),
+    );
+    const meaningfulUnverifiedCount = majorClaims.filter(
+      (c) => c.verificationStatus === "unverified" || c.verificationStatus === "contradicted",
+    ).length;
+
+    const websiteWeak =
+      websiteDiscovery != null && websiteDiscovery.status !== "official_site_found";
+    const trustClaimsCentral =
+      majorClaims.length >= 2 || claims.some((c) => c.type === "audit");
+
+    if (verdict === "Safe") {
+      if (
+        hasMajorContradicted ||
+        auditUnverifiedOrContradicted ||
+        partnerSponsorEcoUnverifiedOrContradicted ||
+        meaningfulUnverifiedCount >= 2
+      ) {
+        verdict = "Caution";
+      } else if (websiteWeak && trustClaimsCentral) {
+        verdict = "Caution";
+      }
+    }
+
+    return verdict;
   }
 
   private normalizeText(input: string | undefined): string {

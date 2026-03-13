@@ -574,6 +574,9 @@ function buildCleanAssessment(result: ScanResult): string {
     if (result.elephantMemory?.isKnownScammer) return "Authority previously flagged. Do not interact.";
     if (result.verdict === "Danger") return "Multiple risk factors identified. Treat as high risk and do not invest.";
     if (result.verdict === "Caution") return "Some risk indicators present. Review the findings before any exposure.";
+    if (result.websiteDiscovery && result.websiteDiscovery.status !== "official_site_found") {
+      return "No official project website was discovered from current metadata. This limits visual verification and weakens trust; other risks remain outside this assessment.";
+    }
     return "No critical red flags identified in this scan. Other risks remain outside this assessment.";
   }
   return raw.length <= 160 ? raw : raw.slice(0, 157) + "…";

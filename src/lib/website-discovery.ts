@@ -112,7 +112,9 @@ export function discoverWebsite(sources: {
       selectedWebsite: null,
       sourceConfidence: "none",
       candidateLinks: candidates,
-      statusReason: hasSocial ? "Only social links found; no project website." : "No website or social links found.",
+      statusReason: hasSocial
+        ? "Only social links found from available metadata; no independent project website identified. You can optionally add a website URL in the app and rescan if there is an official site."
+        : "No website or social links discovered from available metadata. If you know the official project website, add it in the app and rescan.",
     };
   }
 
@@ -136,8 +138,8 @@ export function discoverWebsite(sources: {
       sourceConfidence: isExplicitWebsite ? "high" : "low",
       candidateLinks: candidates,
       statusReason: isExplicitWebsite
-        ? "Single project website from token metadata."
-        : "Website candidate inferred from token metadata.",
+        ? "Official project website discovered from available token metadata."
+        : "Website candidate inferred from current token metadata; treat as lower confidence.",
     };
   }
 
@@ -147,6 +149,6 @@ export function discoverWebsite(sources: {
     selectedWebsite: fallback?.url ?? null,
     sourceConfidence: "low",
     candidateLinks: candidates,
-    statusReason: "Single link used as website candidate.",
+    statusReason: "Single link used as website candidate from available metadata; confidence is limited.",
   };
 }
