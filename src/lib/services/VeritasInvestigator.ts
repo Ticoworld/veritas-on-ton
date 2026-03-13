@@ -1080,12 +1080,22 @@ export class VeritasInvestigator {
     const addedClaims = [...currentClaims].filter((k) => !priorClaims.has(k));
     const removedClaims = [...priorClaims].filter((k) => !currentClaims.has(k));
     const claimTypeLabel = (k: string) => k.split(":")[0] ?? "claim";
-    if (addedClaims.length > 0) {
-      const topAdded = addedClaims.slice(0, 2).map(claimTypeLabel).join(", ");
+    const addedTypes = new Set(addedClaims.map(claimTypeLabel));
+    const removedTypes = new Set(removedClaims.map(claimTypeLabel));
+    const changedTypes = new Set([...addedTypes].filter((t) => removedTypes.has(t)));
+    const addedOnlyTypes = [...addedTypes].filter((t) => !changedTypes.has(t));
+    const removedOnlyTypes = [...removedTypes].filter((t) => !changedTypes.has(t));
+
+    if (changedTypes.size > 0) {
+      const changedList = [...changedTypes].slice(0, 4).join(", ");
+      changes.push(`Claim type changed: ${changedList}.`);
+    }
+    if (addedOnlyTypes.length > 0) {
+      const topAdded = addedOnlyTypes.slice(0, 2).join(", ");
       changes.push(`Website claims added since previous scan: ${topAdded}.`);
     }
-    if (removedClaims.length > 0) {
-      const topRemoved = removedClaims.slice(0, 2).map(claimTypeLabel).join(", ");
+    if (removedOnlyTypes.length > 0) {
+      const topRemoved = removedOnlyTypes.slice(0, 2).join(", ");
       changes.push(`Website claims removed since previous scan: ${topRemoved}.`);
     }
 

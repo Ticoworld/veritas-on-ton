@@ -607,6 +607,20 @@ function sanitizeProfileSummary(text: string, verdict: string): string {
   return t;
 }
 
+/** Verdict-first: when Caution/Danger, always show consistent profile label (no raw AI). */
+function profileLabelForVerdict(verdict: string): string | null {
+  if (verdict === "Caution") return "Some risk indicators";
+  if (verdict === "Danger") return "High-risk profile";
+  return null;
+}
+
+/** Verdict-first: when Caution/Danger, always show consistent summary (no raw AI). */
+function summaryForVerdict(verdict: string): string | null {
+  if (verdict === "Caution") return "Some risk indicators present. Review the findings before any exposure.";
+  if (verdict === "Danger") return "Multiple risk factors identified. Treat as high risk.";
+  return null;
+}
+
 function hasMeaningfulDrift(drift: ScanResult["websiteDrift"]): boolean {
   return !!drift?.priorSnapshotExists && (drift.materialChangesDetected || (drift.keyChanges?.length ?? 0) > 0);
 }
@@ -818,12 +832,12 @@ function SlowVision({
             <div>
               <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: textSecondary }}>Profile</span>
               <p className="mt-0.5 text-xs font-mono" style={{ color: textPrimary }}>
-                {hasOverclaimingProfileSummary(result.criminalProfile)
+                {profileLabelForVerdict(result.verdict) ?? (hasOverclaimingProfileSummary(result.criminalProfile)
                   ? (result.verdict === "Safe" ? "Lower-risk profile" : result.verdict === "Caution" ? "Some risk indicators" : "High-risk profile")
-                  : result.criminalProfile}
+                  : result.criminalProfile)}
               </p>
               <p className="mt-1 text-xs font-mono leading-relaxed" style={{ color: textPrimary }}>
-                {sanitizeProfileSummary(result.summary, result.verdict)}
+                {summaryForVerdict(result.verdict) ?? sanitizeProfileSummary(result.summary, result.verdict)}
               </p>
             </div>
             {result.thoughtSummary && (
