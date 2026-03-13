@@ -42,6 +42,7 @@ import {
   type ReputationSignals,
 } from "@/lib/db/elephant";
 import { getDisplayVerdictForLineage } from "@/lib/bot/normalized-result";
+import { discoverWebsite, type WebsiteDiscoveryResult } from "@/lib/website-discovery";
 import { LRUCache } from "lru-cache";
 import { createHash } from "crypto";
 
@@ -133,7 +134,10 @@ export interface InvestigationResult {
 
   /** Phase 4: Repeated-pattern signals across prior scans (claims, domain, visual). */
   reputationSignals?: ReputationSignals;
-  
+
+  /** Website discovery status and selected URL (official_site_found, social_only, etc.). */
+  websiteDiscovery?: WebsiteDiscoveryResult;
+
   // Social links
   socials: {
     website?: string;
@@ -175,7 +179,11 @@ export class VeritasInvestigator {
   /**
    * Main investigation entry point
    */
-  async investigate(tokenAddress: string): Promise<InvestigationResult> {
+  /** Optional: user-provided website URL when no confident official site is found (e.g. from Mini App). */
+  async investigate(
+    tokenAddress: string,
+    options?: { websiteOverride?: string },
+  ): Promise<InvestigationResult> {
     // Cache check — repeat scans return in ~0ms
     const cacheKey = tokenAddress.trim();
     const cached = resultCache.get(cacheKey);
@@ -281,6 +289,43 @@ export class VeritasInvestigator {
       } catch (e) {
         console.warn("[Veritas] cache path buildReputationSignals failed:", e);
       }
+      // Persistence backfill: ensure lineage record exists (fixes empty deployer_lineage when first run skipped or failed)
+      const cachedCreator = ledgerCached.creatorHistory?.creatorAddress;
+      if (cachedCreator && cachedCreator !== "Unknown") {
+        try {
+          const { identitySource } = this.getLineageIdentityOptions(
+            tokenInfo.mintAuthority ?? null,
+            tokenInfo.freezeAuthority ?? null,
+          );
+          let websiteDomain: string | undefined;
+          if (ledgerCached.socials?.website) {
+            try {
+              websiteDomain = new URL(ledgerCached.socials.website).hostname;
+            } catch {
+              websiteDomain = undefined;
+            }
+          }
+          await saveLineageRecord({
+            deployerAddress: cachedCreator,
+            tokenAddress,
+            tokenName: ledgerCached.tokenName ?? "Unknown",
+            tokenSymbol: ledgerCached.tokenSymbol ?? "???",
+            scannedAt: new Date(ledgerCached.analyzedAt ?? Date.now()),
+            verdict: ledgerCached.verdict,
+            displayVerdict: getDisplayVerdictForLineage(ledgerCached),
+            identitySource,
+            keyFlags: {
+              isDumped: ledgerCached.onChain?.isDumped,
+              isWhale: (ledgerCached.onChain?.creatorPercentage ?? 0) > 20,
+              visualAssetReuse: ledgerCached.visualAssetReuse,
+            },
+            websiteDomain,
+            claimSummary: strongestClaimSummary(Array.isArray(ledgerCached.claims) ? ledgerCached.claims : []),
+          });
+        } catch (e) {
+          console.warn("[Veritas] cache path saveLineageRecord backfill failed:", e);
+        }
+      }
       return ledgerCached;
     }
 
@@ -330,29 +375,57 @@ export class VeritasInvestigator {
     const decimals = tokenInfo.decimals || 0;
     const supply = Number(tokenInfo.supply) / Math.pow(10, decimals);
 
-    const [socials, marketData, rugCheckReport, holderResult] = await Promise.all([
+    const [socials, marketData, rugCheckReport, holderResult, priorSnapshotForDiscovery] = await Promise.all([
       getTokenSocials(tokenAddress),
       getMarketAnalysis(tokenAddress),
       fetchTonSecurity(tokenAddress),
       getHolderDistribution(tokenAddress, supply, decimals),
+      getLatestWebsiteSnapshotByToken(tokenAddress),
     ]);
 
     const { topHolders, top10Percentage } = holderResult;
-    
+    const priorSnapshotUrl = priorSnapshotForDiscovery?.websiteUrl;
+
+    const websiteDiscovery = discoverWebsite({
+      website: socials?.website,
+      twitter: socials?.twitter,
+      telegram: socials?.telegram,
+      discord: socials?.discord,
+      priorSnapshotUrl: priorSnapshotUrl ?? null,
+    });
+
+    let websiteUrl: string | undefined = websiteDiscovery.selectedWebsite ?? socials?.website;
+    if (options?.websiteOverride?.trim()) {
+      const override = options.websiteOverride.trim();
+      const isOverrideReal =
+        !override.includes("t.me") &&
+        !override.includes("telegram.me") &&
+        !override.includes("x.com") &&
+        !override.includes("twitter.com");
+      if (isOverrideReal) {
+        websiteUrl = override;
+        (websiteDiscovery as { selectedWebsite: string | null }).selectedWebsite = override;
+        (websiteDiscovery as { status: typeof websiteDiscovery.status }).status =
+          websiteDiscovery.status === "no_site_found" || websiteDiscovery.status === "social_only"
+            ? "site_found_low_confidence"
+            : websiteDiscovery.status;
+      }
+    }
+
+    const twitterUrl = socials?.twitter;
+
     const creatorStatus = this.analyzeCreator(
       tokenInfo.mintAuthority,
       tokenInfo.freezeAuthority,
       topHolders,
       supply
     );
-    
+
     // =========================================================================
     // PHASE 3: SCREENSHOT + CREATOR HISTORY (Parallel, non-critical)
     // Screenshot runs for all real website URLs — vision is Veritas's primary edge.
+    // websiteUrl already set from discovery (or websiteOverride) above.
     // =========================================================================
-    const websiteUrl = socials?.website;
-    const twitterUrl = socials?.twitter;
-
     const isRealWebsite =
       !!websiteUrl &&
       String(websiteUrl).trim() !== "" &&
@@ -667,6 +740,7 @@ export class VeritasInvestigator {
       lineage: lineageSummary,
       websiteDrift,
       reputationSignals,
+      websiteDiscovery,
       socials: {
         website: socials?.website,
         twitter: socials?.twitter,
@@ -683,8 +757,9 @@ export class VeritasInvestigator {
 
     await saveScanResult(tokenAddress, finalResult, "unified");
 
-    // Persist lineage record (Phase 2) when we have an authority address (mint/freeze)
-    if (creatorStatus.creatorAddress && creatorStatus.creatorAddress !== "Unknown") {
+    // Persist lineage record (Phase 2) when we have an authority address (mint or freeze from contract)
+    const authorityForLineage = tokenInfo.mintAuthority ?? tokenInfo.freezeAuthority ?? null;
+    if (authorityForLineage) {
       let websiteDomain: string | undefined;
       if (socials?.website) {
         try {
@@ -693,24 +768,28 @@ export class VeritasInvestigator {
           websiteDomain = undefined;
         }
       }
-      const displayVerdict: LineageDisplayVerdict = getDisplayVerdictForLineage(finalResult);
-      await saveLineageRecord({
-        deployerAddress: creatorStatus.creatorAddress,
-        tokenAddress,
-        tokenName,
-        tokenSymbol,
-        scannedAt: new Date(),
-        verdict: finalVerdict,
-        displayVerdict,
-        identitySource,
-        keyFlags: {
-          isDumped: creatorStatus.isDumped,
-          isWhale: creatorStatus.isWhale,
-          visualAssetReuse,
-        },
-        websiteDomain,
-        claimSummary: strongestClaimSummary(claims),
-      });
+      try {
+        const displayVerdict: LineageDisplayVerdict = getDisplayVerdictForLineage(finalResult);
+        await saveLineageRecord({
+          deployerAddress: authorityForLineage,
+          tokenAddress,
+          tokenName,
+          tokenSymbol,
+          scannedAt: new Date(),
+          verdict: finalVerdict,
+          displayVerdict,
+          identitySource,
+          keyFlags: {
+            isDumped: creatorStatus.isDumped,
+            isWhale: creatorStatus.isWhale,
+            visualAssetReuse,
+          },
+          websiteDomain,
+          claimSummary: strongestClaimSummary(claims),
+        });
+      } catch (e) {
+        console.warn("[Veritas] saveLineageRecord failed:", e);
+      }
     }
 
     // Persist website snapshot for future drift comparison and Phase 4 reputation

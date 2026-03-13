@@ -122,6 +122,12 @@ interface ScanResult {
   lineage?: LineageSummary;
   websiteDrift?: WebsiteDriftSummary;
   reputationSignals?: ReputationSignals;
+  websiteDiscovery?: {
+    status: string;
+    selectedWebsite: string | null;
+    sourceConfidence: string;
+    statusReason?: string;
+  };
   analyzedAt: string;
   analysisTimeMs: number;
 }
@@ -137,6 +143,7 @@ function getInitData(): string {
 
 export function TruthConsole() {
   const [address, setAddress] = useState("");
+  const [websiteOverride, setWebsiteOverride] = useState("");
   const [fastResult, setFastResult] = useState<FastResult | null>(null);
   const [fastStatus, setFastStatus] = useState<FetchStatus>("idle");
   const [slowResult, setSlowResult] = useState<ScanResult | null>(null);
@@ -191,7 +198,10 @@ export function TruthConsole() {
           "Content-Type": "application/json",
           "x-telegram-init-data": getInitData(),
         },
-        body: JSON.stringify({ address: addr }),
+        body: JSON.stringify({
+          address: addr,
+          website: websiteOverride.trim() || undefined,
+        }),
         signal,
       });
       if (signal.aborted) return;
@@ -269,6 +279,7 @@ export function TruthConsole() {
 
   const handleReset = () => {
     setAddress("");
+    setWebsiteOverride("");
     setFastResult(null);
     setSlowResult(null);
     setFastStatus("idle");
@@ -334,6 +345,24 @@ export function TruthConsole() {
           <p className="text-xs" style={{ color: textSecondary }}>
             Token contract/mint address, not your wallet
           </p>
+          <div>
+            <label className="text-[10px] font-mono uppercase tracking-wider block mb-1" style={{ color: textSecondary }}>
+              Website URL (optional)
+            </label>
+            <input
+              type="url"
+              value={websiteOverride}
+              onChange={(e) => setWebsiteOverride(e.target.value)}
+              placeholder="If no project site was found, add one"
+              disabled={isScanning}
+              className="w-full px-3 py-2 rounded-sm font-mono text-xs focus:outline-none transition-colors disabled:opacity-50"
+              style={{
+                backgroundColor: "var(--tg-theme-secondary-bg-color, #0A0A0B)",
+                border: "1px solid var(--tg-theme-hint-color, #27272A)",
+                color: "var(--tg-theme-text-color, #FAFAFA)",
+              }}
+            />
+          </div>
 
           {error && (
             <div
@@ -650,6 +679,16 @@ function SlowVision({
         {getShortVisualSummary(result) && (
           <p className="text-xs font-mono" style={{ color: textSecondary }}>{getShortVisualSummary(result)}</p>
         )}
+        {result.websiteDiscovery && (
+          <p className="text-[10px] font-mono" style={{ color: textSecondary }}>
+            Website: {result.websiteDiscovery.statusReason ?? result.websiteDiscovery.status}
+            {result.websiteDiscovery.selectedWebsite && (
+              <span className="block mt-0.5 truncate" title={result.websiteDiscovery.selectedWebsite}>
+                {result.websiteDiscovery.selectedWebsite}
+              </span>
+            )}
+          </p>
+        )}
         {(result.claims?.length ?? 0) > 0 && (
           <div className="rounded border p-3" style={cardStyle}>
             <div className="flex items-center gap-2 mb-2">
@@ -689,7 +728,7 @@ function SlowVision({
               <ul className="mt-2 space-y-1">
                 {result.lineage.priorLaunches.slice(0, 5).map((p, i) => (
                   <li key={i} className="text-[10px] font-mono" style={{ color: textSecondary }}>
-                    {p.tokenName} (${p.tokenSymbol}) — {p.displayLabel} — {p.scannedAt.slice(0, 10)}
+                    {p.tokenName} (${p.tokenSymbol}) — previously assessed as {p.displayLabel} — {p.scannedAt.slice(0, 10)}
                   </li>
                 ))}
               </ul>

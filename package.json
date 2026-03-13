@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "generate:sentinel": "npx tsx scripts/generate_sentinel.ts",
+    "check:mongo": "npx tsx scripts/check-mongo-counts.ts",
     "mcp": "npx tsx mcp-core/mcp-server.ts",
     "start:mcp": "tsx mcp-core/server-http.ts"
   },

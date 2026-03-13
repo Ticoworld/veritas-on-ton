@@ -38,9 +38,9 @@ export interface LineageRecord {
   tokenName: string;
   tokenSymbol: string;
   scannedAt: Date;
-  /** Internal engine verdict (kept for compatibility). */
+  /** Historical verdict at time of that scan (not current token state). */
   verdict: "Safe" | "Caution" | "Danger";
-  /** Product-facing verdict at scan time — used to separate suspicious/high-risk from cannot-verify. */
+  /** Historical display verdict at scan time. Surface as "previously assessed as …" in UI. */
   displayVerdict?: LineageDisplayVerdict;
   /** How this address was derived (mint/freeze authority). */
   identitySource?: LineageIdentitySource;
@@ -106,9 +106,9 @@ export interface WebsiteSnapshotRecord {
     telegram?: string;
     discord?: string;
   };
-  /** Phase 4: Verdict at scan time for reputation (prior flagged counts). */
+  /** Phase 4: Historical verdict at time of that scan (for reputation counts). Not current truth. */
   verdictAtScan?: "Safe" | "Caution" | "Danger";
-  /** Phase 4: Display verdict at scan time (optional). */
+  /** Phase 4: Historical display verdict at time of that scan. Use "previously assessed as …" in UI. */
   displayVerdictAtScan?: LineageDisplayVerdict;
   /** Phase 4: Hash of normalized visual summary for repeated-pattern lookup. */
   visualSummaryHash?: string;
@@ -586,6 +586,7 @@ export async function buildReputationSignals(
   const typeComboKey = (types: Set<string>) => [...types].sort().join("+");
 
   const recent = await getRecentWebsiteSnapshots(400, { excludeTokenAddress: tokenAddress });
+  // verdictAtScan is historical (at time of that scan); used only for prior-flagged counts
   const flagged = recent.filter((s) => isFlaggedVerdict(s.verdictAtScan));
 
   // Same domain in prior scans; how many had verdict data and how many were flagged

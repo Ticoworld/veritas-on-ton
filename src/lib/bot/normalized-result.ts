@@ -6,6 +6,7 @@
 import type { InvestigationResult } from "@/lib/services/VeritasInvestigator";
 import type { Claim } from "@/lib/claims";
 import type { LineageSummary, WebsiteDriftSummary, ReputationSignals } from "@/lib/db/elephant";
+import type { WebsiteDiscoveryResult } from "@/lib/website-discovery";
 import { strongestClaimSummary } from "@/lib/claims";
 
 /** Internal verdict from scan engine (unchanged). */
@@ -52,6 +53,8 @@ export interface BotScanResult {
   websiteDrift?: WebsiteDriftSummary;
   /** Phase 4: Repeated-pattern signals across prior scans. */
   reputationSignals?: ReputationSignals;
+  /** Website discovery status and selected URL. */
+  websiteDiscovery?: WebsiteDiscoveryResult;
   analysisTimeMs: number;
   dataCoverage: DataCoverage;
   /** When screenshot was saved (relative path); bot may prepend base URL. */
@@ -273,6 +276,7 @@ export function investigationResultToBotResult(r: InvestigationResult): BotScanR
     lineage: r.lineage,
     websiteDrift: r.websiteDrift,
     reputationSignals: r.reputationSignals,
+    websiteDiscovery: r.websiteDiscovery,
     analysisTimeMs: r.analysisTimeMs,
     dataCoverage,
     screenshotPublicUrl: r.screenshotPublicUrl,

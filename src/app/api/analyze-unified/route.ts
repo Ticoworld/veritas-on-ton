@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     checkRateLimit(ip);
 
     const body = await request.json();
-    const { address } = body;
+    const { address, website: websiteOverride } = body as { address?: string; website?: string };
 
     if (!address || typeof address !== "string") {
       return NextResponse.json(
@@ -82,7 +82,10 @@ export async function POST(request: NextRequest) {
     // GRAND UNIFICATION: Single Service Orchestrates Everything
     // ═══════════════════════════════════════════════════════════════════
     const investigator = new VeritasInvestigator();
-    const result = await investigator.investigate(normalizedAddress);
+    const result = await investigator.investigate(normalizedAddress, {
+      websiteOverride:
+        typeof websiteOverride === "string" && websiteOverride.trim() ? websiteOverride.trim() : undefined,
+    });
 
     // Return standardized response
     return NextResponse.json({
