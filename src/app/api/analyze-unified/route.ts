@@ -1,14 +1,6 @@
 /**
- * VERITAS UNIFIED API - Single Entry Point
- *
  * POST /api/analyze-unified
- *
- * Grand Unification: Replaces /api/scan and /api/analyze
- * Uses the VeritasInvestigator service for complete flow:
- * - Elephant Memory check
- * - Full data pipeline
- * - AI analysis (Sherlock)
- * - Scammer flagging
+ * Main investigation route for the Mini App.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -23,8 +15,7 @@ import { validateTelegramData } from "@/lib/security/telegram";
 function getClientIp(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-for");
   const real = request.headers.get("x-real-ip");
-  const ip = forwarded?.split(",")[0]?.trim() || real || "unknown";
-  return ip;
+  return forwarded?.split(",")[0]?.trim() || real || "unknown";
 }
 
 export async function POST(request: NextRequest) {
@@ -36,6 +27,7 @@ export async function POST(request: NextRequest) {
         { status: 401 },
       );
     }
+
     const botToken = process.env.TELEGRAM_BOT_TOKEN ?? "";
     if (!validateTelegramData(initData, botToken)) {
       return NextResponse.json(
@@ -44,14 +36,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    // RATE LIMIT (The Bouncer) - before any work
-    // ═══════════════════════════════════════════════════════════════════
-    const ip = getClientIp(request);
-    checkRateLimit(ip);
+    checkRateLimit(getClientIp(request));
 
     const body = await request.json();
-    const { address, website: websiteOverride } = body as { address?: string; website?: string };
+    const { address, website: websiteOverride } = body as {
+      address?: string;
+      website?: string;
+    };
 
     if (!address || typeof address !== "string") {
       return NextResponse.json(
@@ -60,34 +51,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    // TON-aware address validation and normalization (same as bot)
-    // ═══════════════════════════════════════════════════════════════════
     const normalizedAddress = parseAndNormalizeTonAddress(address.trim());
     if (!normalizedAddress) {
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid TON address. Send the jetton contract address in TON-friendly format (base64).",
+          error:
+            "Invalid TON address. Send the jetton contract address in TON-friendly format (base64).",
         },
         { status: 400 },
       );
     }
 
     console.log(
-      `[Unified API] 🚀 Investigation request for ${normalizedAddress.slice(0, 8)}...`,
+      `[Unified API] Investigation request for ${normalizedAddress.slice(0, 8)}...`,
     );
 
-    // ═══════════════════════════════════════════════════════════════════
-    // GRAND UNIFICATION: Single Service Orchestrates Everything
-    // ═══════════════════════════════════════════════════════════════════
     const investigator = new VeritasInvestigator();
     const result = await investigator.investigate(normalizedAddress, {
       websiteOverride:
-        typeof websiteOverride === "string" && websiteOverride.trim() ? websiteOverride.trim() : undefined,
+        typeof websiteOverride === "string" && websiteOverride.trim()
+          ? websiteOverride.trim()
+          : undefined,
     });
 
-    // Return standardized response
     return NextResponse.json({
       success: true,
       data: result,
@@ -104,8 +91,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.error("[Unified API] ❌ Investigation error:", error);
-
+    console.error("[Unified API] Investigation error:", error);
     const message =
       error instanceof Error ? error.message : "An unexpected error occurred";
 

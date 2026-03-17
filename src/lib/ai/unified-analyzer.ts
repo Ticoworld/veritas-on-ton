@@ -1,7 +1,6 @@
 /**
- * Veritas Unified Analyzer v2.0
- * Single call to Gemini with URL Context + Google Search grounding
- * Replaces the two-phase Scanner + Sherlock flow
+ * Veritas unified analyzer.
+ * Runs one Gemini call with URL context, search grounding, and optional website screenshot input.
  */
 
 import {
@@ -23,7 +22,7 @@ export interface UnifiedAnalysisResult {
   verdict: "Safe" | "Caution" | "Danger";
   summary: string;
 
-  // Sherlock-style profiling
+  // Short profile label used in the result surface
   criminalProfile: string;
 
   // Evidence and reasoning
@@ -325,7 +324,7 @@ export async function runUnifiedAnalysis(
   const prompt = buildUnifiedPrompt(data, hasScreenshot);
   
   // Build content parts — text first, then website screenshot only
-  const contentParts: any[] = [{ text: prompt }];
+  const contentParts: Array<{ text: string } | ReturnType<typeof createPartFromBase64>> = [{ text: prompt }];
   
   if (data.websiteScreenshot) {
     console.log("[Unified Analyzer] 📸 Including WEBSITE screenshot (media_resolution: medium)");

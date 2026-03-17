@@ -253,7 +253,7 @@ export function investigationResultToBotResult(r: InvestigationResult): BotScanR
   if (displayVerdict === "Cannot verify") {
     nextActions = ["Insufficient data for a confident verdict; rescan when more sources are available or use other tools."];
   }
-  const summaryLine = toProfessionalSummary(r, displayVerdict, dataCoverage);
+  const summaryLine = toProfessionalSummary(r, displayVerdict);
   const claims = r.claims ?? [];
   const claimSummary = strongestClaimSummary(claims);
 
@@ -292,7 +292,6 @@ function formatShortUsd(n: number): string {
 function toProfessionalSummary(
   r: InvestigationResult,
   displayVerdict: DisplayVerdict,
-  dataCoverage: DataCoverage
 ): string {
   if (r.elephantMemory?.isKnownScammer) {
     return "This token is linked to a creator previously flagged for fraud. Do not interact.";

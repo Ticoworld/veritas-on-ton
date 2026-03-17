@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
-import { TonConnectProvider } from "@/components/providers/TonConnectProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,9 +14,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Veritas | AI Crypto Scam Detection",
-  description: "AI-powered forensic analysis for TON tokens. Detect rug pulls, serial scammers, and fake projects using Gemini 3 multimodal vision.",
-  keywords: ["TON", "web3", "rug pull", "crypto", "scanner", "anti-scam", "gemini", "ai"],
+  title: "Veritas | TON Trust Investigation",
+  description:
+    "Telegram-native TON trust investigation for website claims, token truth, website drift, and repeated trust-abuse patterns.",
+  keywords: ["TON", "Telegram", "trust investigation", "website claims", "token analysis"],
   icons: {
     icon: "/images/logo.png",
     apple: "/images/logo.png",
@@ -42,7 +42,7 @@ export default function RootLayout({
           src="https://telegram.org/js/telegram-web-app.js"
           strategy="beforeInteractive"
         />
-        <TonConnectProvider>{children}</TonConnectProvider>
+        {children}
       </body>
     </html>
   );

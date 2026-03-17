@@ -1,368 +1,119 @@
-## Veritas — TON Website Truth & Trust Investigator
-
-**Veritas is a Telegram-native TON trust investigation agent that checks website claims, token controls, authority-linked history, website drift, and repeated trust‑abuse patterns in one scan.**
-
-It is built to answer a concrete user question:
-
-> “If I tap this meme coin link in Telegram, what does its own website, token contract, and launch history really say about trust?”
-
-Veritas is not a generic “all-in-one scanner.” Its wedge is **website truth + authority history + cross‑scan abuse patterns**, surfaced inside a Telegram Mini App and bot.
-
----
+# Veritas
+Telegram-native TON trust investigation for website claims, token truth, website drift, and repeated trust-abuse patterns.
 
 ## Problem
+TON tokens are often discovered inside Telegram through links, screenshots, landing pages, and social posts before a user ever reads the contract.
 
-Most TON token scanners focus on:
+Most token checks stop at token mechanics. They can tell you about mint authority, holder concentration, or liquidity, but they usually miss the trust surface that actually sells the token:
 
-- contract flags (mint / freeze / proxy)
-- holder concentration
-- basic market stats
+- fake or unsupported website claims
+- trust badges and partnership language
+- quiet website changes after launch
+- repeated website and claim patterns across prior risky launches
 
-They rarely look at:
+That leaves a gap between what a project says and what the token and its history actually support.
 
-- what the **website actually claims** (audit / partner / ecosystem / renounced)
-- whether those claims are **supported, unverified, or contradicted**
-- whether this **authority has launched risky tokens before**
-- whether the **website quietly changed** after launch
-- whether **similar trust patterns** appeared across prior suspicious tokens
+## What Veritas Does
+- Claims check: extract website trust claims and mark them as verified, unverified, contradicted, or unknown.
+- Website truth vs token truth: compare what the site says against on-chain token controls and available source data.
+- Website drift: compare the current site against prior Veritas snapshots when available.
+- Repeated trust-abuse patterns: surface repeated domains, repeated unsupported claim motifs, and similar prior patterns in Veritas records.
+- Authority-linked prior scan history: show prior launches linked to the same mint or freeze authority when records exist.
 
-For Telegram users, this means:
+## Why This Matters on TON
+TON distribution is deeply Telegram-native. Users are often one tap away from a landing page and one paste away from a token.
 
-- “safe” scores on tokens with deceptive landing pages
-- no memory of serial launchers and reused domains
-- no honest “Cannot verify” when data is missing
+That makes website and social trust surfaces unusually important. If the website is deceptive, stale, or quietly changing, a contract-only check is not enough.
 
----
+## Product Surface
+Veritas has two user-facing surfaces:
 
-## Solution
+- Telegram bot: paste a TON jetton address and get a verdict card, reasons, and optional follow-up sections for claims, drift, reputation, and authority history.
+- Telegram Mini App: paste the same address and get a fast on-chain and market view first, then the full trust investigation once the slower analysis completes.
 
-Veritas runs a **single investigation pipeline** for a TON jetton address that combines:
+In both surfaces, the user is not just told a verdict. They are shown why: website claims, site status, drift, repeated patterns, and prior authority-linked history where available.
 
-- **Claims check** — structured audit/partner/sponsor/ecosystem/renounced/listing claims, with verification status and evidence.
-- **Authority history** — prior launches **linked to this mint/freeze authority** in Veritas records, with careful copy that never claims deployer identity.
-- **Website drift** — comparison of the current website against prior snapshots (by token first, then domain) to highlight material trust‑signal changes.
-- **Reputation signals** — repeated trust‑abuse patterns across scans (same domain in prior flagged scans, repeated unsupported claim motifs, weak visual repetition), with strong vs weak signal hierarchy.
+## Honest Limits
+- Authority history is keyed from mint or freeze authority. That address is not guaranteed to be the original deployer.
+- Website discovery depends on current token metadata and, in the Mini App, an optional user-provided website override.
+- Repeated patterns are signals, not proof of coordination or fraud.
+- Historical verdicts are historical scan outputs, not current truth.
+- History-backed features depend on stored Veritas records. Without MongoDB, live analysis still works, but drift, prior-pattern checks, and authority history are limited.
+- Visual evidence depends on whether a real project website is available and screenshot capture succeeds.
 
-All of this is presented inside:
-
-- a **Telegram bot** (verdict card + Full Report), and
-- a **Telegram Mini App** (Truth Console UI) backed by a Next.js app.
-
----
-
-## Why Veritas is different
-
-Most TON scanners:
-
-- stop at contract + liquidity checks,
-- ignore website content beyond “has URL,” and
-- treat every scan as stateless.
-
-Veritas is different in four ways:
-
-- **Claims check** — it extracts trust claims from the website (audit / partner / sponsor / ecosystem / renounced / listing) and classifies each as **verified / unverified / contradicted / unknown**, with short evidence and deterministic on‑chain overrides for “renounced”.
-- **Authority history** — it persists **authority‑linked launch history** keyed by mint/freeze authority (not deployer), and surfaces prior suspicious/high‑risk launches with explicit “in our records” and “authority may not be the original deployer” caveats.
-- **Website drift** — it stores website snapshots per scan, then compares the current page against prior token/domain snapshots to flag added/removed claims, social changes, and technical page/branding changes.
-- **Reputation signals** — it looks for **repeated patterns** across scans (same domain in prior flagged tokens, repeated unsupported trust claims, authority plus pattern) and labels each signal as **strong** or **weak** so that only meaningful repetition influences the top summary.
-
-The result is a Telegram‑native experience that **feels like a forensic investigator with memory**, not just another score.
-
----
-
-## Core features
-
-- **Telegram bot verdict card**
-  - Verdict: Likely legitimate / Suspicious / High risk / Cannot verify.
-  - Short reasons plus screenshot link when available.
-  - Inline buttons: Full report, Why risky, Rescan.
-
-- **Telegram Mini App (“Truth Console”)**
-  - Fast HUD (on‑chain + market) and full unified report.
-  - Top “Finding” block that can surface a strong claim, authority, drift, or reputation signal.
-  - Dedicated sections for **Claims check**, **Authority history**, **Website drift**, and **Reputation signals**.
-
-- **Claims check (Phase 1)**
-  - Claim types: `audit | partner | sponsor | ecosystem | renounced | listing`.
-  - Each claim has `verificationStatus: verified | unverified | contradicted | unknown` plus short evidence.
-  - On‑chain override for `renounced` (mint/freeze authorities disabled vs still enabled).
-
-- **Authority history (Phase 2)**
-  - MongoDB `deployer_lineage` collection keyed by authority address (mint/freeze).
-  - `LineageSummary` reports number of prior launches, counts for suspicious/high‑risk vs cannot‑verify, and a list of prior tokens with verdict labels.
-  - Copy always says “this authority appears in N prior tokens in our records”; it never claims deployer identity.
-
-- **Website drift (Phase 3)**
-  - `website_snapshots` collection stores per‑scan website URL, domain, visual summary, claims, socials, content fingerprint, and optional screenshot URL.
-  - On each scan, Veritas compares the current snapshot against the best prior snapshot (same token first, else same domain) and reports whether material trust‑signal changes were detected.
-
-- **Reputation signals (Phase 4, hardened)**
-  - **Strong signals**:
-    - Same domain seen in prior suspicious/high‑risk scans.
-    - Repeated **claim combination** (2+ types) in prior flagged tokens.
-    - Repeated **unsupported/contradicted** claim motif in prior flagged tokens.
-    - **Authority + pattern**: this authority has prior flagged launches **and** a domain or strong claim motif also appears in prior flagged scans.
-  - **Weak signals**:
-    - Generic single‑type repetition (e.g. “audit” alone) across flagged tokens.
-    - Repeated visual fingerprint (same normalized visual summary hash).
-  - Only **strong** signals can drive the top‑level reputation finding; weak signals are always marked as such.
-
----
-
-## How it works (high‑level flow)
-
-1. User sends a TON jetton address in Telegram (bot chat or Mini App).
-2. Backend normalizes the address and passes it to `VeritasInvestigator.investigate(address)`.
-3. Investigator:
-   - checks **Elephant Memory** for known scammers (instant block),
-   - fetches on‑chain and market data (TonAPI adapter + market API),
-   - fetches creator history,
-   - resolves socials and project website,
-   - captures a screenshot (ScreenshotOne / Microlink),
-   - calls **Gemini** with on‑chain + market + visual context for unified analysis,
-   - applies on‑chain claim verification,
-   - computes trust score and verdict,
-   - persists scan to Mongo (ThreatLedger cache, authority history, website snapshot),
-   - derives website drift and reputation signals.
-4. The **Telegram bot** formats a verdict card and optional full report.
-5. The **Mini App** fetches the same unified result and renders the Truth Console.
-
----
-
-## Architecture diagram (Mermaid)
-
-```mermaid
-flowchart LR
-  tgUser[Telegram user] --> botOrMini[(Telegram Bot / Mini App)]
-
-  subgraph Frontend / API
-    botOrMini --> nextAPI[Next.js API<br/>/api/analyze-fast<br/>/api/analyze-unified]
-    botOrMini --> tgWebhook[Telegram bot webhook<br/>/api/telegram/webhook]
-  end
-
-  nextAPI --> investigator[Veritas Investigator<br/>(unified scan service)]
-  tgWebhook --> investigator
-
-  investigator --> tonApi[TON RPC / TonAPI adapter]
-  investigator --> market[Market data<br/>(DexScreener / market API)]
-  investigator --> screenshot[Website screenshot<br/>(ScreenshotOne / Microlink)]
-  investigator --> gemini[Gemini vision + analysis]
-  investigator --> mongo[(MongoDB / Elephant Memory)]
-
-  mongo --> investigator
-
-  investigator --> nextAPI
-  investigator --> tgWebhook
-
-  nextAPI --> botOrMini
-  tgWebhook --> tgUser
-```
-
----
-
-## Telegram + Mini App user flow
-
-- **Telegram bot**
-  - `/start` explains what Veritas does and how to submit a token address.
-  - User pastes a TON jetton address (48‑character friendly base64).
-  - Bot runs the unified investigation and returns:
-    - a compact verdict card (verdict, confidence band, 2–4 strongest reasons, coverage summary, visual status),
-    - an optional screenshot photo with caption when screenshot capture and public URL are configured,
-    - inline buttons for **Full report** and **Why risky?** that expand into multi‑section messages (Claims check, Website drift, Authority history, Reputation signals, Unknowns & limitations, Next actions).
-
-- **Telegram Mini App (Truth Console)**
-  - Launched from the bot or as a pinned app.
-  - User pastes the jetton address and triggers a scan.
-  - UI shows:
-    - **Fast lane**: quick on‑chain + market HUD.
-    - **Slow lane**: full unified report once Gemini + screenshot work completes.
-  - Sections:
-    - Summary (trust score, verdict, “Finding” block).
-    - Top reasons (evidence bullets).
-    - AI Vision (visual narrative).
-    - Claims check.
-    - Website drift.
-    - Authority history.
-    - Reputation signals.
-    - Limitations note when visual or market data is missing.
-
----
-
-## Tech stack
-
-- **Runtime / framework**
-  - Next.js 16 (App Router, API routes) on Node.js.
-  - TypeScript end‑to‑end.
-
-- **Telegram**
-  - Telegram Bot API webhook: `src/app/api/telegram/webhook/route.ts`.
-  - Telegram Web Apps (Mini App) via `@twa-dev/sdk`.
-
-- **TON / data**
-  - TON blockchain adapter for jetton metadata and holders (`src/lib/blockchain.ts`).
-  - Market data via DexScreener / market API wrapper (`src/lib/api/market.ts`).
-  - Creator history (`src/lib/api/historian.ts`).
-
-- **AI and vision**
-  - Google Gemini via `@google/genai` (`src/lib/ai/unified-analyzer.ts`).
-  - Screenshot capture via ScreenshotOne (and Microlink fallback) in `src/lib/api/screenshot.ts`.
-
-- **Persistence**
-  - MongoDB (Atlas or self‑hosted) via `src/lib/db/mongodb.ts`.
-  - **Elephant Memory** in `src/lib/db/elephant.ts`:
-    - `scammers` — known scammer authorities.
-    - `scan_ledger` — 24h ThreatLedger cache of full results.
-    - `deployer_lineage` — authority history records.
-    - `website_snapshots` — website drift + reputation base.
-
-- **MCP (optional)**
-  - MCP servers in `mcp-core/` (stdio + HTTP) expose the same `VeritasInvestigator` for agents, but the hackathon focus is Telegram and the Mini App.
-
----
-
-## Setup instructions
-
-### 1. Install dependencies
-
+## Demo / Usage
+### 1. Install
 ```bash
-git clone https://github.com/your-org/veritas-on-ton.git
-cd veritas-on-ton
 npm install
 ```
 
-### 2. Environment variables
+### 2. Configure environment
+Copy `.env.example` to `.env.local` and set the values you need.
 
-Copy `.env.example` to `.env.local` and fill at least:
+Required:
 
-```bash
-GEMINI_API_KEY=your_gemini_api_key_here
+- `GEMINI_API_KEY`
+- `TELEGRAM_BOT_TOKEN`
 
-# Telegram bot
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-# Optional but recommended: secret to protect the webhook
-TELEGRAM_WEBHOOK_SECRET=your_shared_secret
+Recommended for the full product surface:
 
-# MongoDB (Elephant Memory + ThreatLedger)
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/veritas
+- `MONGODB_URI` for prior records, drift, and repeated-pattern detection
+- `TELEGRAM_WEBHOOK_SECRET` for webhook verification
+- `VERITAS_SAVE_SCREENSHOTS=true`
+- `VERITAS_PUBLIC_BASE_URL=https://your-app.vercel.app`
+- `SCREENSHOTONE_ACCESS_KEY`
 
-# Screenshot + public URL (for Telegram photo messages)
-VERITAS_SAVE_SCREENSHOTS=true
-VERITAS_PUBLIC_BASE_URL=https://your-app.vercel.app
-SCREENSHOTONE_ACCESS_KEY=your_screenshotone_key
-```
+Notes:
 
-Recommended additional variables (if used in your deployment):
+- Screenshot-backed Telegram photo replies require `VERITAS_SAVE_SCREENSHOTS=true` and a public base URL.
+- `SCREENSHOTONE_ACCESS_KEY` is optional; Veritas can fall back to Microlink, but screenshot capture is still website-dependent.
 
-- `RUGCHECK_API_KEY` — external contract risk API (if configured).
-- `MCP_PORT` / `PORT` — for the HTTP MCP server when used.
-
-### 3. Run the Next.js app (Mini App + APIs)
-
+### 3. Run locally
 ```bash
 npm run dev
 ```
 
-This starts:
+This starts the Next.js app and the API routes used by the Mini App and bot webhook.
 
-- the Telegram Mini App frontend under the Next.js dev server, and
-- the REST APIs (`/api/analyze-fast`, `/api/analyze-unified`, `/api/telegram/webhook`).
+### 4. Configure the Telegram bot webhook
+Deploy the app to a public URL, then point your bot webhook to:
 
-For production:
-
-```bash
-npm run build
-npm run start
+```text
+https://your-app.vercel.app/api/telegram/webhook
 ```
 
-### 4. Configure Telegram webhook
+If you use `TELEGRAM_WEBHOOK_SECRET`, set the same secret when configuring the webhook.
 
-1. Set `TELEGRAM_BOT_TOKEN` and (optionally) `TELEGRAM_WEBHOOK_SECRET`.
-2. Deploy the Next.js app to a public URL (e.g. Vercel).
-3. Set the bot webhook to `https://your-app.vercel.app/api/telegram/webhook` (include the secret in BotFather if using `TELEGRAM_WEBHOOK_SECRET`).
+### 5. Important runtime note
+The core scan routes, `/api/analyze-fast` and `/api/analyze-unified`, are Telegram-gated. They expect valid Telegram Mini App init data in the `x-telegram-init-data` header.
 
-### 5. (Optional) Start MCP servers
+In practice, that means the real scan flow is intended to run through Telegram, not as an open public browser form.
 
-If you want to use Veritas from agent frameworks via MCP:
-
-```bash
-# STDIO MCP
-npm run mcp
-
-# HTTP MCP (SSE / Streamable HTTP)
-npm run start:mcp
+## Architecture
+```mermaid
+flowchart LR
+  user[User in Telegram] --> surface[Bot or Mini App]
+  surface --> routes[Next.js routes]
+  routes --> investigator[VeritasInvestigator]
+  investigator --> ton[TON or token data]
+  investigator --> web[Website discovery and screenshots]
+  investigator --> ai[Gemini analysis]
+  investigator --> mongo[MongoDB records]
+  investigator --> result[Verdict and evidence]
+  result --> surface
 ```
 
----
+Main routes:
 
-## Demo flow (for judges)
+- `/api/telegram/webhook`
+- `/api/analyze-fast`
+- `/api/analyze-unified`
 
-You can also use `docs/DEMO_TEST_TEMPLATE.md` as a runbook. A simple live demo:
+## Repo Structure
+- `src/lib/services/VeritasInvestigator.ts` - main investigation pipeline
+- `src/app/api/telegram/webhook/route.ts` - Telegram bot entrypoint
+- `src/components/truth/TruthConsole.tsx` - Mini App interface
+- `src/lib/db/elephant.ts` - stored records for history, drift, and repeated-pattern checks
 
-1. **Legit token**
-   - Paste a well‑known TON jetton address.
-   - Show the verdict (likely legitimate), stable trust score, clean Claims check section, and “no major visual deception” in Visual + Website drift.
-2. **Suspicious / high‑risk token**
-   - Paste a token with risky controls (enabled mint/freeze, high holder concentration) and a promotional website.
-   - Show:
-     - mint/freeze warnings in the on‑chain section,
-     - contradicted or unsupported claims in the Claims check,
-     - authority history if this authority appears in prior flagged tokens,
-     - any website drift (claims added/removed, social changes),
-     - reputation signals (same domain / repeated unsupported claim motif) when present.
-3. **Cannot verify token**
-   - Paste a token with no real project website or missing market/on‑chain data.
-   - Show the **“Cannot verify”** verdict, explicit coverage gaps (visual / market / on‑chain), and that no false certainty is claimed.
-
----
-
-## Limitations and honesty
-
-Veritas is a **decision support tool**, not an oracle of truth:
-
-- It cannot see private keys, off‑chain agreements, or undisclosed team behavior.
-- Gemini’s analysis is bounded by the screenshot, on‑chain/market data, and search context at scan time.
-- Website drift and reputation signals are only as strong as the history Veritas has stored; new tokens and untouched domains will have limited history.
-- Authority history is keyed by mint/freeze authority. That address may not be the original deployer; the UI and bot copy state this explicitly.
-- Repetition of claims, domains, or visual patterns is **evidence**, not proof of a scam network. The copy deliberately avoids “scam proof” or “fraud proven” language.
-
-Users and integrators should treat Veritas as **one strong input** into their risk process, not the sole arbiter.
-
----
-
-## Why this matters for TON users
-
-TON is growing quickly, with many tokens launched and promoted directly inside Telegram.  
-The surface area for **website‑level deception** and **serial launchers** is large, and most scanners do not look there.
-
-Veritas gives TON users and bots:
-
-- fast visibility into **what the website claims**, whether those claims are supported, and how the contract is actually configured;
-- context on whether this **authority has appeared in prior suspicious launches**;
-- an explanation of **how the website changed** over time; and
-- a memory of **repeated trust‑abuse patterns** across scans.
-
-This combination makes “open a link → paste an address” in Telegram meaningfully safer without promising perfect safety.
-
----
-
-## Submission‑ready closing
-
-Veritas is ready to be:
-
-- **run locally** (Next.js + MongoDB + Gemini + Telegram bot), or
-- **deployed** to a public URL for Track 2 Telegram demos.
-
-The codebase is organized so that:
-
-- `VeritasInvestigator` remains the single source of truth for investigations,
-- the Telegram bot and Mini App are thin presentation layers on top of the same unified result, and
-- MongoDB’s Elephant Memory cleanly separates fast cache (ThreatLedger) from longer‑lived history (authority, website snapshots, reputation).
-
-If you want to evaluate or extend Veritas, start from:
-
-- `src/lib/services/VeritasInvestigator.ts` — unified investigation pipeline
-- `src/app/api/telegram/webhook/route.ts` — Telegram bot entrypoint
-- `src/components/truth/TruthConsole.tsx` — Mini App Truth Console
-
-Everything else is implementation detail. The core idea is simple:  
-**make website truth, authority history, and repeated trust‑abuse patterns visible to TON users where they trade — inside Telegram.**
-
+## Submission Note
+Veritas is a Track 2 Telegram-native TON trust investigation product. Its focus is not generic token scoring. Its focus is checking whether a project's website story is supported by token truth and prior Veritas records.

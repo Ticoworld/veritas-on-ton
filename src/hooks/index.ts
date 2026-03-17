@@ -1,1 +1,0 @@
-// useScanner removed

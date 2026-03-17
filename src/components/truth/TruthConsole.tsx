@@ -15,7 +15,6 @@ import {
   Lock,
   Unlock,
 } from "lucide-react";
-import { TonConnectButton } from "@tonconnect/ui-react";
 
 type MainButtonAPI = {
   setText: (t: string) => void;
@@ -296,9 +295,6 @@ export function TruthConsole() {
 
   return (
     <>
-      <div className="fixed top-4 right-4 z-10">
-        <TonConnectButton />
-      </div>
       <div className="w-full max-w-2xl mx-auto px-3 flex flex-col gap-4">
         <div className="space-y-3">
           <div className="flex items-center gap-2 mb-2">
@@ -522,7 +518,9 @@ function SkeletonSlowVision() {
           <div className="h-2.5 w-4/5 rounded animate-pulse" style={bgStyle} />
         </div>
         <div className="px-4 py-1.5 border-t text-center" style={borderStyle}>
-          <span className="text-[9px] font-mono" style={{ color: "var(--tg-theme-hint-color)" }}>Not financial advice. Powered by Gemini.</span>
+          <span className="text-[9px] font-mono" style={{ color: "var(--tg-theme-hint-color)" }}>
+            Findings depend on the website, on-chain, market, and prior-record data available in this scan.
+          </span>
         </div>
       </div>
     </div>

@@ -1,23 +1,16 @@
 /**
- * VERITAS INVESTIGATOR - Master Service Class
- * 
- * The Grand Unification: Single orchestrator for all token fraud detection.
- * Replaces the fragmented analyze/scan/unified routes.
- * 
- * Flow:
- * 1. Check Elephant Memory (instant block for known scammers)
- * 2. Fetch Data Pipeline (blockchain, DexScreener, Market, Screenshots). TODO: Replace with TON API.
- * 3. AI Analysis (Unified Analyzer - "Sherlock" brain)
- * 4. Save to Elephant Memory (if DANGER/SCAM verdict)
+ * VeritasInvestigator orchestrates a full TON trust investigation.
+ * It gathers token, website, market, and historical data, runs analysis,
+ * and returns one normalized result for the bot and Mini App.
  */
 
-import { getTokenInfo, getHolderDistribution, validateAddress } from "@/lib/blockchain";
+import { getTokenInfo, getHolderDistribution, validateAddress, type TokenInfoStub } from "@/lib/blockchain";
 import { getTokenSocials } from "@/lib/api/dexscreener";
 import { getMarketAnalysis } from "@/lib/api/market";
-import { getCreatorHistory } from "@/lib/api/historian";
+import { getCreatorHistory, type CreatorTokenHistory } from "@/lib/api/historian";
 import { fetchScreenshotAsBase64 } from "@/lib/api/screenshot";
-import { fetchTonSecurity, type TonSecurityReport } from "@/lib/api/tonsecurity";
-import { runUnifiedAnalysis, type UnifiedAnalysisInput, type UnifiedAnalysisResult } from "@/lib/ai/unified-analyzer";
+import { fetchTonSecurity } from "@/lib/api/tonsecurity";
+import { runUnifiedAnalysis, type UnifiedAnalysisInput } from "@/lib/ai/unified-analyzer";
 import { applyOnChainClaimVerification, strongestClaimSummary, type Claim } from "@/lib/claims";
 import {
   checkKnownScammer,
@@ -503,7 +496,9 @@ export class VeritasInvestigator {
             fullPage: true,
           }).catch(() => null)
         : Promise.resolve(null),
-      getCreatorHistory(creatorStatus.creatorAddress).catch(() => [] as any[]),
+      getCreatorHistory(creatorStatus.creatorAddress).catch(
+        (): CreatorTokenHistory[] => [],
+      ),
     ]);
 
     if (isRealWebsite && websiteScreenshot) {
@@ -1209,7 +1204,7 @@ export class VeritasInvestigator {
   
   private buildKnownScammerResult(
     tokenAddress: string,
-    tokenInfo: any,
+    tokenInfo: TokenInfoStub,
     creatorAddress: string,
     knownScammer: ScammerRecord,
     elapsed: number
