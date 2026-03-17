@@ -670,7 +670,7 @@ function hasMeaningfulLineage(lineage: ScanResult["lineage"]): boolean {
 }
 
 /** The set of claim types that trigger the positive-label gate (mirrors the bot-path MAJOR_GATE_CLAIM_TYPES). */
-const MAJOR_GATE_CLAIM_TYPES_UI = new Set(["audit", "partner", "sponsor", "ecosystem", "listing"]);
+const MAJOR_GATE_CLAIM_TYPES_UI = new Set(["audit", "partner", "sponsor", "ecosystem", "listing", "implied_affiliation"]);
 
 /**
  * Returns true when the token has a Safe internal verdict but one or more gate conditions fail,

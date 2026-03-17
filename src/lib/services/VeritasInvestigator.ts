@@ -974,7 +974,7 @@ export class VeritasInvestigator {
   ): "Safe" | "Caution" | "Danger" {
     let verdict = baseVerdict;
     const claims = Array.isArray(aiClaims) ? aiClaims : [];
-    const majorTypes: Array<Claim["type"]> = ["audit", "partner", "sponsor", "ecosystem"];
+    const majorTypes: Array<Claim["type"]> = ["audit", "partner", "sponsor", "ecosystem", "implied_affiliation"];
     const majorClaims = claims.filter((c) => majorTypes.includes(c.type));
     const notVerified = (s: string) => s === "unverified" || s === "contradicted" || s === "unknown";
 

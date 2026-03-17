@@ -127,6 +127,9 @@ In visualAnalysis you MUST:
    - If YES: what was detected (e.g. template match to known scam layouts, fake partnership logos, recycled branding).
    - If unclear: "Visual analysis inconclusive; asset reuse could not be determined."
 3. Meme culture imagery (Pepe, Wojak, Doge, community art) = NEUTRAL. Do not treat as scam signal.
+4. PRESTIGE THEATER CHECK (independent of reuse):
+   Scan the image for: logo walls or badge grids displaying real institution/brand names (banks, investment funds, exchanges, regulators, compliance bodies) without explicit "Official Partner of [brand]" text; "as seen on" / "featured by" galleries; institutional-grade language (tokenized RWA, treasury management, acquisition pipeline, asset-backed) that implies regulated-finance legitimacy without textual proof of any relationship; implied endorsement layouts.
+   If ANY such signal is visible: extract one "implied_affiliation" claim per named institution or pattern in the claims array (see Claims Extraction below). This is SEPARATE from the VISUAL ASSET REUSE flag — original prestige-theater branding is still flagged here even when REUSE is NO.
 ` : '';
 
   const noScreenshotInstructions = !hasScreenshot ? `
@@ -145,11 +148,13 @@ Screenshot capture failed or no real website URL was found. You have NO image da
 # INVESTIGATION STEPS
 
 ## Step 1: VISION ANALYSIS (PRIMARY)
-Assess the screenshot for template reuse and deceptive visuals only. Do not narrate layout.
+Assess the screenshot for template reuse and deceptive visuals. Do not narrate layout.
 Cross-check: if the site claims "renounced" or contract address, does on-chain confirm? Lies = claims that contradict on-chain facts.
+Also apply the PRESTIGE THEATER CHECK (visual instruction #4 above) and extract any implied_affiliation claims you find.
 
-## Step 2: GOOGLE SEARCH (OPTIONAL)
-Search "${data.tokenName} TON scam" or "rugpull" if useful.
+## Step 2: GOOGLE SEARCH — SCAM AND IMPLIED-AFFILIATION VERIFICATION
+a) Search "${data.tokenName} TON scam" or "rugpull" if useful.
+b) If the screenshot shows real institution or brand names (bank, fund, exchange, regulator, or similar) displayed without explicit partnership text: search "[institution name] ${data.tokenName}" to verify whether that institution publicly acknowledges any relationship with this project. If no public acknowledgment is found, mark the implied_affiliation claim "unverified". If the institution has explicitly denied or has no association record, mark "contradicted".
 ` : `
 # INVESTIGATION STEPS (TEXT-ONLY — NO SCREENSHOT)
 
@@ -188,13 +193,14 @@ ${investigationSteps}
 
 # CLAIMS EXTRACTION (REQUIRED)
 Extract website trust claims into a structured "claims" array. For each claim found on the site or in the screenshot, add one object.
-Claim types (use exactly): audit | partner | sponsor | ecosystem | renounced | listing
+Claim types (use exactly): audit | partner | sponsor | ecosystem | renounced | listing | implied_affiliation
+- implied_affiliation: a logo wall, badge grid, or prestige-language pattern that displays real institution/brand names or implies institutional endorsement without an explicit proven relationship. Use rawClaim to name the institution or describe the pattern (e.g. "BlackRock logo in partner grid", "institutional treasury language without named partner").
 Verification status (use exactly): verified | unverified | contradicted | unknown
-- verified: you found independent support (e.g. audit report, official listing, on-chain matches).
+- verified: you found independent support (e.g. audit report, official listing, on-chain matches, brand's own press release confirming relationship).
 - unverified: claim is present but no independent support found in this scan (do NOT use "fake" or "fraudulent").
-- contradicted: claim is directly contradicted by on-chain data or a reliable source (e.g. "renounced" but mint/freeze enabled).
+- contradicted: claim is directly contradicted by on-chain data or a reliable source (e.g. "renounced" but mint/freeze enabled; or brand's official channels confirm no relationship).
 - unknown: could not determine (e.g. no search result, ambiguous).
-Do not overclaim. If evidence is weak, use unverified or unknown. For "renounced" / "immutable" / "safe contract" claims, set status based on ON-CHAIN FACTS above (mint/freeze). For audit/partner/sponsor/ecosystem/listing, use Google Search or URL context when helpful; if no public support found, mark unverified.
+Do not overclaim. If evidence is weak, use unverified or unknown. For "renounced" / "immutable" / "safe contract" claims, set status based on ON-CHAIN FACTS above (mint/freeze). For audit/partner/sponsor/ecosystem/listing/implied_affiliation, use Google Search or URL context when helpful; if no public support found, mark unverified.
 
 # OUTPUT FORMAT — Respond with ONLY this JSON:
 {
@@ -206,7 +212,7 @@ Do not overclaim. If evidence is weak, use unverified or unknown. For "renounced
   "evidence": ["<Key finding 1>", "<Key finding 2>", "<Key finding 3>"],
   "analysis": ["<Security check>", "<Market read>", "<Website assessment>"],
   "claims": [
-    { "type": "<audit|partner|sponsor|ecosystem|renounced|listing>", "rawClaim": "<short claim text>", "sourceContext": "<optional>", "verificationStatus": "<verified|unverified|contradicted|unknown>", "evidence": "<short reason>" }
+    { "type": "<audit|partner|sponsor|ecosystem|renounced|listing|implied_affiliation>", "rawClaim": "<short claim text>", "sourceContext": "<optional>", "verificationStatus": "<verified|unverified|contradicted|unknown>", "evidence": "<short reason>" }
   ],
   "visualAnalysis": "${hasScreenshot ? "MANDATORY: Start with 'VISUAL ASSET REUSE: YES' or 'VISUAL ASSET REUSE: NO'. Then 1-3 short forensic sentences only (no page-structure narration)." : ""}",
   "degenComment": "<One short, security-grade takeaway. Concise. No slang, no emojis, no hype. E.g. 'On-chain and visual checks support a lower-risk read; other risks remain outside this scan.' or 'Multiple risk factors; treat as high risk.'>"
@@ -235,7 +241,7 @@ Do not overclaim. If evidence is weak, use unverified or unknown. For "renounced
 `;
 }
 
-const CLAIM_TYPES_SET = new Set<string>(["audit", "partner", "sponsor", "ecosystem", "renounced", "listing"]);
+const CLAIM_TYPES_SET = new Set<string>(["audit", "partner", "sponsor", "ecosystem", "renounced", "listing", "implied_affiliation"]);
 const STATUS_SET = new Set<string>(["verified", "unverified", "contradicted", "unknown"]);
 
 function parseClaims(raw: unknown): Claim[] {

@@ -24,8 +24,8 @@ export function getScreenshotOneUrl(
     url,
     format: "jpeg",
     image_quality: "80",
-    viewport_width: "800",
-    viewport_height: fullPage ? "2000" : "1200",
+    viewport_width: "1280",
+    viewport_height: fullPage ? "4000" : "1200",
     block_ads: "true",
     block_cookie_banners: "true",
     block_trackers: "true",
@@ -56,11 +56,11 @@ export function getMicrolinkUrl(
   params.append("screenshot.type", "jpeg");
 
   if (fullPage) {
-    params.append("viewport.width", "800");
-    params.append("viewport.height", "2000");
+    params.append("viewport.width", "1280");
+    params.append("viewport.height", "4000");
     params.append("screenshot.fullPage", "true");
   } else {
-    params.append("viewport.width", "800");
+    params.append("viewport.width", "1280");
     params.append("viewport.height", "1200");
   }
 

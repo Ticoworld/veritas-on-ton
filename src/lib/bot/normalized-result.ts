@@ -132,7 +132,7 @@ function confidenceToBand(score: number): ConfidenceBand {
  * when unresolved trust-surface concerns remain (unverified claims, prior reputation signals, claim drift).
  * This is a display-layer calibration only; the internal verdict and score are not modified.
  */
-const MAJOR_GATE_CLAIM_TYPES = new Set<string>(["audit", "partner", "sponsor", "ecosystem", "listing"]);
+const MAJOR_GATE_CLAIM_TYPES = new Set<string>(["audit", "partner", "sponsor", "ecosystem", "listing", "implied_affiliation"]);
 
 function applyPositiveLabelGate(base: DisplayVerdict, r: InvestigationResult): DisplayVerdict {
   if (base !== "Likely legitimate") return base;

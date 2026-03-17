@@ -10,6 +10,7 @@ export const CLAIM_TYPES = [
   "ecosystem",
   "renounced",
   "listing",
+  "implied_affiliation",
 ] as const;
 
 export type ClaimType = (typeof CLAIM_TYPES)[number];
