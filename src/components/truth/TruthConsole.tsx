@@ -572,6 +572,8 @@ function getShortVisualSummary(result: ScanResult): string | null {
 const SHILL_PATTERN = /\b(frens|wen\b|gm\b|ser\b|ngmi|wagmi|degen|shill|aping|ape in|moon|mooning|based|clean as a|culture king|real deal|sending it|let'?s go|LFG\b|anon\b|fren\b|bro\b|chad\b|based af|king\b|whistl|whistle|top-tier find|gem\b|alpha\b)\b/i;
 
 function buildCleanAssessment(result: ScanResult): string {
+  // Mixed trust signals: safe verdict but gate failed — must not show optimistic AI copy.
+  if (isMixedTrustSignals(result)) return "Trust claims or prior signals could not be fully verified. Review the findings before any interaction.";
   if (result.verdict === "Caution") return "Some risk indicators present. Review the findings before any exposure.";
   if (result.verdict === "Danger") return "Multiple risk factors identified. Treat as high risk and do not invest.";
   const raw = (result.degenComment ?? "").replace(/\s+/g, " ").trim();
@@ -611,22 +613,30 @@ function sanitizeProfileSummary(text: string, verdict: string): string {
   return t;
 }
 
-/** Verdict-first: when Caution/Danger, always show consistent profile label (no raw AI). */
-function profileLabelForVerdict(verdict: string): string | null {
+/** Verdict-first: when Caution/Danger/Mixed, always show consistent profile label (no raw AI). */
+function profileLabelForVerdict(verdict: string, resolvedDisplayVerdict?: string): string | null {
+  if (resolvedDisplayVerdict === "Mixed trust signals") return "Unresolved trust-surface concerns";
   if (verdict === "Caution") return "Some risk indicators";
   if (verdict === "Danger") return "High-risk profile";
   return null;
 }
 
-/** Verdict-first: when Caution/Danger, always show consistent summary (no raw AI). */
-function summaryForVerdict(verdict: string): string | null {
+/** Verdict-first: when Caution/Danger/Mixed, always show consistent summary (no raw AI). */
+function summaryForVerdict(verdict: string, resolvedDisplayVerdict?: string): string | null {
+  if (resolvedDisplayVerdict === "Mixed trust signals") return "Trust claims or prior signals could not be fully verified. Review findings before any interaction.";
   if (verdict === "Caution") return "Some risk indicators present. Review the findings before any exposure.";
   if (verdict === "Danger") return "Multiple risk factors identified. Treat as high risk.";
   return null;
 }
 
-/** Verdict-first: when Caution/Danger, "Why" bullets must not contradict verdict (no lower-risk / high transparency). */
-function whyBulletsForVerdict(verdict: string): string[] | null {
+/** Verdict-first: when Caution/Danger/Mixed, "Why" bullets must not contradict verdict. */
+function whyBulletsForVerdict(verdict: string, resolvedDisplayVerdict?: string): string[] | null {
+  if (resolvedDisplayVerdict === "Mixed trust signals") {
+    return [
+      "One or more trust claims could not be independently verified, or prior scan signals are present.",
+      "Review the claims check and findings sections before any exposure.",
+    ];
+  }
   if (verdict === "Caution") {
     return [
       "Some trust claims could not be independently verified in this scan.",
@@ -659,9 +669,56 @@ function hasMeaningfulLineage(lineage: ScanResult["lineage"]): boolean {
   return !!lineage?.hasPriorHistory;
 }
 
+/** The set of claim types that trigger the positive-label gate (mirrors the bot-path MAJOR_GATE_CLAIM_TYPES). */
+const MAJOR_GATE_CLAIM_TYPES_UI = new Set(["audit", "partner", "sponsor", "ecosystem", "listing"]);
+
+/**
+ * Returns true when the token has a Safe internal verdict but one or more gate conditions fail,
+ * meaning it should display as "Mixed trust signals" rather than "Lower-risk in this scan".
+ * Mirrors the applyPositiveLabelGate logic in normalized-result.ts.
+ */
+function isMixedTrustSignals(result: ScanResult): boolean {
+  if (result.verdict !== "Safe") return false;
+  const claims = result.claims ?? [];
+  const hasContradictedClaim = claims.some((c) => c.verificationStatus === "contradicted");
+  const hasUnverifiedMajorClaim = claims.some(
+    (c) => MAJOR_GATE_CLAIM_TYPES_UI.has(c.type) && c.verificationStatus !== "verified",
+  );
+  const hasStrongRepSignal = !!(
+    result.reputationSignals?.sameDomainInPriorFlagged ||
+    result.reputationSignals?.authorityPlusPattern ||
+    result.reputationSignals?.repeatedClaimMotif?.strength === "strong"
+  );
+  const hasMaterialClaimDrift = !!(
+    result.websiteDrift?.materialChangesDetected &&
+    result.websiteDrift.keyChanges?.some(
+      (c) =>
+        c.startsWith("Claim type changed") ||
+        c.startsWith("Website claims added") ||
+        c.startsWith("Website claims removed"),
+    )
+  );
+  const websiteConfidenceLow = !!(
+    result.websiteDiscovery && result.websiteDiscovery.status !== "official_site_found"
+  );
+  return hasContradictedClaim || hasUnverifiedMajorClaim || hasStrongRepSignal || hasMaterialClaimDrift || websiteConfidenceLow;
+}
+
+/** Resolves the final user-facing display verdict for the Mini App, including the positive-label gate. */
+function resolveDisplayVerdictUI(result: ScanResult): string {
+  if (result.elephantMemory?.isKnownScammer) return "Known scammer";
+  if (result.verdict === "Safe") {
+    return isMixedTrustSignals(result) ? "Mixed trust signals" : "Lower-risk in this scan";
+  }
+  if (result.verdict === "Caution") return "Suspicious";
+  if (result.verdict === "Danger") return "High risk";
+  return result.verdict;
+}
+
 /**
  * Verdict-aware headline finding selection.
- * "Likely legitimate" tokens: only genuine claim contradictions or strong domain/authority signals may headline.
+ * "Lower-risk in this scan" tokens: only genuine claim contradictions or strong domain/authority signals may headline.
+ * "Mixed trust signals" tokens (safe verdict that failed gate): treat like Suspicious for headline selection.
  * "Suspicious" / "High risk": current-scan claim findings rank above drift and reputation noise.
  */
 function selectHeadlineFinding(result: ScanResult): string | null {
@@ -677,8 +734,8 @@ function selectHeadlineFinding(result: ScanResult): string | null {
     ? (result.reputationSignals?.strongestReputationFinding ?? null)
     : null;
 
-  if (result.verdict === "Safe") {
-    // "Likely legitimate": headline only from genuine claim contradictions or domain/authority risk signals.
+  if (result.verdict === "Safe" && !isMixedTrustSignals(result)) {
+    // "Lower-risk in this scan": headline only from genuine claim contradictions or domain/authority risk signals.
     // Drift and weak reputation must not headline a token that passed all scan checks.
     if (hasContradiction && claimFinding) return claimFinding;
     if (strongRepFinding) return strongRepFinding;
@@ -711,12 +768,14 @@ function SlowVision({
   onReset: () => void;
 }) {
   const [showDetails, setShowDetails] = useState(false);
+  // Compute the calibrated display verdict once and thread it through all coherence surfaces.
+  const resolvedDisplayVerdict = resolveDisplayVerdictUI(result);
   const borderStyle = { borderColor: "var(--tg-theme-hint-color, #27272A)" };
   return (
     <div className="rounded-lg border overflow-hidden" style={{ ...cardStyle, border: "1px solid var(--tg-theme-hint-color, #27272A)" }}>
       <div className="flex items-center justify-between px-4 py-2 border-b" style={borderStyle}>
         <div className="flex items-center gap-2">
-          <VerdictBadge verdict={result.verdict} isKnownScammer={result.elephantMemory?.isKnownScammer} />
+          <VerdictBadge verdict={result.verdict} isKnownScammer={result.elephantMemory?.isKnownScammer} displayLabel={resolvedDisplayVerdict} />
         </div>
         <span className="text-[10px] font-mono" style={{ color: textSecondary }}>
           {(result.analysisTimeMs / 1000).toFixed(1)}s
@@ -732,11 +791,11 @@ function SlowVision({
             </div>
           ) : null;
         })()}
-        {((result.evidence?.length > 0 || result.analysis?.length > 0) || whyBulletsForVerdict(result.verdict)) && (
+        {((result.evidence?.length > 0 || result.analysis?.length > 0) || whyBulletsForVerdict(result.verdict, resolvedDisplayVerdict)) && (
           <div>
             <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: textSecondary }}>Why</span>
             <ul className="mt-1 space-y-0.5">
-              {(whyBulletsForVerdict(result.verdict) ?? (result.evidence?.length ? result.evidence : result.analysis)?.slice(0, 3) ?? []).map((line, i) => (
+              {(whyBulletsForVerdict(result.verdict, resolvedDisplayVerdict) ?? (result.evidence?.length ? result.evidence : result.analysis)?.slice(0, 3) ?? []).map((line, i) => (
                 <li key={i} className="text-xs font-mono" style={{ color: textPrimary }}>• {line}</li>
               ))}
             </ul>
@@ -889,12 +948,12 @@ function SlowVision({
             <div>
               <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: textSecondary }}>Profile</span>
               <p className="mt-0.5 text-xs font-mono" style={{ color: textPrimary }}>
-                {profileLabelForVerdict(result.verdict) ?? (hasOverclaimingProfileSummary(result.criminalProfile)
+                {profileLabelForVerdict(result.verdict, resolvedDisplayVerdict) ?? (hasOverclaimingProfileSummary(result.criminalProfile)
                   ? (result.verdict === "Safe" ? "Lower-risk profile" : result.verdict === "Caution" ? "Some risk indicators" : "High-risk profile")
                   : result.criminalProfile)}
               </p>
               <p className="mt-1 text-xs font-mono leading-relaxed" style={{ color: textPrimary }}>
-                {summaryForVerdict(result.verdict) ?? sanitizeProfileSummary(result.summary, result.verdict)}
+                {summaryForVerdict(result.verdict, resolvedDisplayVerdict) ?? sanitizeProfileSummary(result.summary, result.verdict)}
               </p>
             </div>
             {result.thoughtSummary && (
@@ -976,13 +1035,13 @@ function SlowVision({
 function getDisplayVerdict(verdict: string, isKnownScammer?: boolean): string {
   if (isKnownScammer) return "Known scammer";
   const v = verdict.toLowerCase();
-  if (v === "safe") return "Likely legitimate";
+  if (v === "safe") return "Lower-risk in this scan";
   if (v === "caution") return "Suspicious";
   if (v === "danger") return "High risk";
   return verdict;
 }
 
-function VerdictBadge({ verdict, isKnownScammer }: { verdict: string; isKnownScammer?: boolean }) {
+function VerdictBadge({ verdict, isKnownScammer, displayLabel }: { verdict: string; isKnownScammer?: boolean; displayLabel?: string }) {
   const config: Record<
     string,
     { bg: string; border: string; color: string; icon: React.ReactNode }
@@ -992,6 +1051,13 @@ function VerdictBadge({ verdict, isKnownScammer }: { verdict: string; isKnownSca
       border: "#166534",
       color: "var(--tg-theme-link-color, #22C55E)",
       icon: <Shield className="w-4 h-4" />,
+    },
+    // "Mixed trust signals" uses the same amber palette as Caution — signals unresolved concerns
+    MIXED: {
+      bg: "#422006",
+      border: "#854D0E",
+      color: "#EAB308",
+      icon: <ShieldAlert className="w-4 h-4" />,
     },
     CAUTION: {
       bg: "#422006",
@@ -1012,9 +1078,10 @@ function VerdictBadge({ verdict, isKnownScammer }: { verdict: string; isKnownSca
       icon: <Skull className="w-4 h-4" />,
     },
   };
-  const styleKey = isKnownScammer ? "SCAM" : verdict.toUpperCase();
+  const resolvedLabel = displayLabel ?? getDisplayVerdict(verdict, isKnownScammer);
+  const styleKey = isKnownScammer ? "SCAM" : resolvedLabel === "Mixed trust signals" ? "MIXED" : verdict.toUpperCase();
   const c = config[styleKey] || config.CAUTION;
-  const label = getDisplayVerdict(verdict, isKnownScammer);
+  const label = resolvedLabel;
 
   return (
     <div

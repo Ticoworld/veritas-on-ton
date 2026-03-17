@@ -5,15 +5,25 @@
 
 import type { InvestigationResult } from "@/lib/services/VeritasInvestigator";
 import type { Claim } from "@/lib/claims";
-import type { LineageSummary, WebsiteDriftSummary, ReputationSignals } from "@/lib/db/elephant";
+import type { LineageSummary, LineageDisplayVerdict, WebsiteDriftSummary, ReputationSignals } from "@/lib/db/elephant";
 import type { WebsiteDiscoveryResult } from "@/lib/website-discovery";
 import { strongestClaimSummary } from "@/lib/claims";
 
 /** Internal verdict from scan engine (unchanged). */
 export type BotVerdict = "Safe" | "Caution" | "Danger";
 
-/** User-facing verdict label. */
-export type DisplayVerdict = "Likely legitimate" | "Suspicious" | "High risk" | "Cannot verify";
+/**
+ * User-facing verdict label.
+ * "Lower-risk in this scan" / "Mixed trust signals" are the calibrated positive labels shown in live display.
+ * "Likely legitimate" is retained in the union for historical lineage records only; not emitted in new scans.
+ */
+export type DisplayVerdict =
+  | "Lower-risk in this scan"
+  | "Mixed trust signals"
+  | "Likely legitimate"
+  | "Suspicious"
+  | "High risk"
+  | "Cannot verify";
 
 export type DataCoverageLevel = "available" | "partial" | "unavailable";
 
@@ -28,7 +38,7 @@ export interface DataCoverage {
 export interface BotScanResult {
   /** Internal verdict (for logic). */
   verdict: BotVerdict;
-  /** User-facing label (Likely legitimate / Suspicious / High risk / Cannot verify). */
+  /** User-facing label (Lower-risk in this scan / Mixed trust signals / Suspicious / High risk / Cannot verify). */
   displayVerdict: DisplayVerdict;
   /** 0–100 internal score; not shown as primary in UI. */
   confidence: number;
@@ -96,20 +106,73 @@ function computeDisplayVerdict(
   return "High risk";
 }
 
-/** Compute display verdict from full result (for lineage persistence). */
-export function getDisplayVerdictForLineage(r: InvestigationResult): DisplayVerdict {
+/**
+ * Compute display verdict from full result for lineage persistence.
+ * Returns only the original 4 legacy values; the calibrated positive-label gate is NOT applied here.
+ */
+export function getDisplayVerdictForLineage(r: InvestigationResult): LineageDisplayVerdict {
   const dataCoverage: DataCoverage = {
     visual: coverageVisual(r),
     onChain: coverageOnChain(r),
     market: coverageMarket(r),
   };
-  return computeDisplayVerdict(r.verdict, dataCoverage);
+  // computeDisplayVerdict only ever returns the 4 legacy values; cast is safe.
+  return computeDisplayVerdict(r.verdict, dataCoverage) as LineageDisplayVerdict;
 }
 
 function confidenceToBand(score: number): ConfidenceBand {
   if (score >= 65) return "High";
   if (score >= 35) return "Medium";
   return "Low";
+}
+
+/**
+ * Honesty / calibration gate for the strongest positive display label.
+ * Real integrations and clean on-chain setup are not alone enough to justify "Lower-risk in this scan"
+ * when unresolved trust-surface concerns remain (unverified claims, prior reputation signals, claim drift).
+ * This is a display-layer calibration only; the internal verdict and score are not modified.
+ */
+const MAJOR_GATE_CLAIM_TYPES = new Set<string>(["audit", "partner", "sponsor", "ecosystem", "listing"]);
+
+function applyPositiveLabelGate(base: DisplayVerdict, r: InvestigationResult): DisplayVerdict {
+  if (base !== "Likely legitimate") return base;
+  const claims = r.claims ?? [];
+  // Condition 1: no contradicted claims
+  const hasContradictedClaim = claims.some((c) => c.verificationStatus === "contradicted");
+  // Condition 2: no unverified / unknown / contradicted major trust claims
+  const hasUnverifiedMajorClaim = claims.some(
+    (c) => MAJOR_GATE_CLAIM_TYPES.has(c.type) && c.verificationStatus !== "verified",
+  );
+  // Condition 3: no strong reputation signal (domain/authority/strong motif)
+  const hasStrongRepSignal = !!(
+    r.reputationSignals?.sameDomainInPriorFlagged ||
+    r.reputationSignals?.authorityPlusPattern ||
+    r.reputationSignals?.repeatedClaimMotif?.strength === "strong"
+  );
+  // Condition 4: no material trust-claim drift (claim add/change/remove — not fingerprint-only)
+  const hasMaterialClaimDrift = !!(
+    r.websiteDrift?.materialChangesDetected &&
+    r.websiteDrift.keyChanges?.some(
+      (c) =>
+        c.startsWith("Claim type changed") ||
+        c.startsWith("Website claims added") ||
+        c.startsWith("Website claims removed"),
+    )
+  );
+  // Condition 5: website confidence not low (penalise only when discovery ran and found non-official site)
+  const websiteConfidenceLow = !!(
+    r.websiteDiscovery && r.websiteDiscovery.status !== "official_site_found"
+  );
+  if (
+    hasContradictedClaim ||
+    hasUnverifiedMajorClaim ||
+    hasStrongRepSignal ||
+    hasMaterialClaimDrift ||
+    websiteConfidenceLow
+  ) {
+    return "Mixed trust signals";
+  }
+  return "Lower-risk in this scan";
 }
 
 /**
@@ -248,10 +311,18 @@ export function investigationResultToBotResult(r: InvestigationResult): BotScanR
     market: coverageMarket(r),
   };
 
-  const displayVerdict = computeDisplayVerdict(r.verdict, dataCoverage);
+  const rawDisplayVerdict = computeDisplayVerdict(r.verdict, dataCoverage);
+  // Honesty gate: apply calibrated positive-label before any display logic runs.
+  const displayVerdict = applyPositiveLabelGate(rawDisplayVerdict, r);
   let nextActions = buildNextActions(r);
   if (displayVerdict === "Cannot verify") {
     nextActions = ["Insufficient data for a confident verdict; rescan when more sources are available or use other tools."];
+  } else if (displayVerdict === "Mixed trust signals") {
+    // Remove the generic safe-path action and replace with a calibrated prompt.
+    nextActions = nextActions.filter((a) => !a.startsWith("No critical issues"));
+    if (nextActions.length === 0) {
+      nextActions = ["Review the unverified trust claims and reputation signals in the findings before any interaction."];
+    }
   }
   const summaryLine = toProfessionalSummary(r, displayVerdict);
   const claims = r.claims ?? [];
@@ -304,6 +375,9 @@ function toProfessionalSummary(
   }
   if (displayVerdict === "Suspicious") {
     return "Some concerns were identified. Review the findings before any interaction.";
+  }
+  if (displayVerdict === "Mixed trust signals") {
+    return "This token passed core checks but has unresolved trust-surface concerns. Review the findings before any interaction.";
   }
   return "No critical issues were found in the data sources used. Other risks (team, contract changes) are outside this assessment.";
 }

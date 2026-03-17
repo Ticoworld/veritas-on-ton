@@ -77,7 +77,7 @@ function strongestReasons(bot: BotScanResult): string[] {
     return reasons;
   }
 
-  if (bot.displayVerdict === "Likely legitimate") {
+  if (bot.displayVerdict === "Lower-risk in this scan") {
     // Only include genuine claim contradictions or domain/authority signals; skip drift noise.
     const hasContradiction = (bot.claims ?? []).some((c) => c.verificationStatus === "contradicted");
     if (hasContradiction && bot.claimSummary) reasons.push(bot.claimSummary);
@@ -109,7 +109,7 @@ function strongestReasons(bot: BotScanResult): string[] {
   if (bot.lineage?.strongestLineageFinding && bot.lineage.lineageIdentityConfidence !== "low") {
     reasons.push(bot.lineage.strongestLineageFinding);
   }
-  if (bot.displayVerdict === "High risk" || bot.displayVerdict === "Suspicious") {
+  if (bot.displayVerdict === "High risk" || bot.displayVerdict === "Suspicious" || bot.displayVerdict === "Mixed trust signals") {
     if (bot.onChainFindings.some((f) => f.includes("Mint authority is enabled"))) reasons.push("Mint authority enabled");
     if (bot.onChainFindings.some((f) => f.includes("Freeze authority is enabled"))) reasons.push("Freeze authority enabled");
     if (bot.visualFindings.some((f) => f.toLowerCase().includes("reuse") || f.toLowerCase().includes("copy"))) reasons.push("Visual scam pattern detected");
@@ -397,11 +397,12 @@ export function formatWhyRisky(bot: BotScanResult): string {
     "",
   ];
 
-  if (bot.displayVerdict === "Likely legitimate") {
+  if (bot.displayVerdict === "Lower-risk in this scan") {
     lines.push("This scan did not identify critical technical red flags in the data sources used.");
     lines.push("Other risk (team behaviour, contract upgradability, market conditions) is outside this assessment.");
     return lines.join("\n");
   }
+  // "Mixed trust signals" falls through to show the detailed why section, same as Suspicious.
 
   if (bot.displayVerdict === "Cannot verify") {
     lines.push("Insufficient data to explain risk. Visual, on-chain, or market data were missing or partial.");
