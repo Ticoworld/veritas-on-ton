@@ -1021,6 +1021,42 @@ export class VeritasInvestigator {
       .trim();
   }
 
+  /**
+   * Derive the stable visual reuse conclusion from a stored visual summary.
+   * Used for drift comparison to avoid noise from Gemini phrasing variation.
+   * Returns one of four stable values; ignores descriptive wording differences.
+   */
+  private extractVisualConclusion(
+    visualSummary: string | undefined,
+  ): "reuse_detected" | "no_reuse" | "not_captured" | "inconclusive" {
+    const t = String(visualSummary ?? "").toLowerCase().trim();
+    if (
+      !t ||
+      t.includes("not captured") ||
+      t.includes("screenshot failed") ||
+      t.includes("no official project website") ||
+      t.includes("social/redirect") ||
+      t.includes("visual forensics unavailable") ||
+      t.includes("visual forensics limited") ||
+      t.includes("visual forensics are limited") ||
+      t.includes("visual analysis could not be performed") ||
+      t.includes("fast-path")
+    ) {
+      return "not_captured";
+    }
+    if (
+      t.includes("possible scam template reuse") ||
+      t.includes("reuse detected") ||
+      /visual asset reuse:\s*yes/.test(t)
+    ) {
+      return "reuse_detected";
+    }
+    if (t.includes("no major visual deception") || /visual asset reuse:\s*no/.test(t)) {
+      return "no_reuse";
+    }
+    return "inconclusive";
+  }
+
   private extractWebsiteDomain(url: string | undefined): string | undefined {
     if (!url) return undefined;
     try {
@@ -1115,9 +1151,24 @@ export class VeritasInvestigator {
       );
     }
 
-    const visualChanged = this.normalizeText(current.visualSummary) !== this.normalizeText(prior.visualSummary);
-    if (visualChanged) {
-      changes.push("Visual trust section changed materially since previous scan.");
+    // Compare only the stable visual reuse conclusion, not raw Gemini prose.
+    // This prevents non-deterministic Gemini wording changes from firing as drift on stable sites.
+    const priorVisualConclusion = this.extractVisualConclusion(prior.visualSummary);
+    const currentVisualConclusion = this.extractVisualConclusion(current.visualSummary);
+    // Only fire when BOTH snapshots had active visual coverage; availability transitions
+    // are already captured by screenshotStateChanged above.
+    if (
+      priorVisualConclusion !== currentVisualConclusion &&
+      currentVisualConclusion !== "not_captured" &&
+      priorVisualConclusion !== "not_captured"
+    ) {
+      const conclusionLabel =
+        currentVisualConclusion === "reuse_detected"
+          ? "Visual: analysis now flags possible asset reuse (was not flagged previously)."
+          : currentVisualConclusion === "no_reuse"
+          ? "Visual: analysis no longer flags asset reuse (previously flagged or inconclusive)."
+          : "Visual: reuse conclusion changed to inconclusive since previous scan.";
+      changes.push(conclusionLabel);
     }
 
     const fingerprintChanged =
@@ -1133,7 +1184,19 @@ export class VeritasInvestigator {
     const materialChangesDetected = changes.length > 0;
     let strongestFinding: string | undefined;
     if (materialChangesDetected) {
-      strongestFinding = changes[0];
+      // Rank by severity: claim changes > social > screenshot availability > visual conclusion > fingerprint
+      const claimChange = changes.find(
+        (c) =>
+          c.startsWith("Claim type changed") ||
+          c.startsWith("Website claims added") ||
+          c.startsWith("Website claims removed"),
+      );
+      const socialChange = changes.find((c) => c.startsWith("Social links changed"));
+      const screenshotChange = changes.find((c) => c.startsWith("Screenshot"));
+      const visualChange = changes.find((c) => c.startsWith("Visual:"));
+      const fingerprintEntry = changes.find((c) => c.startsWith("Technical change"));
+      strongestFinding =
+        claimChange ?? socialChange ?? screenshotChange ?? visualChange ?? fingerprintEntry ?? changes[0];
     } else {
       strongestFinding = "No material website trust-signal changes detected since previous scan.";
     }

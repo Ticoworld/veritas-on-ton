@@ -635,8 +635,8 @@ export async function buildReputationSignals(
     if (unsupported) for (const t of unsupported) unsupportedTypeCount[t] = (unsupportedTypeCount[t] ?? 0) + 1;
   }
 
-  // Strong: repeated combination (2+ types) in 2+ prior flagged
-  if (currentCombo && (comboCount[currentCombo] ?? 0) >= 2) {
+  // Strong: repeated combination (2+ types) in 3+ prior flagged (threshold raised to reduce noise on legit projects)
+  if (currentCombo && (comboCount[currentCombo] ?? 0) >= 3) {
     const priorFlaggedCount = comboCount[currentCombo] ?? 0;
     const priorScanCount = flagged.filter((s) => {
       const types = snapshotTypes.get(snapshotKey(s));
@@ -651,7 +651,7 @@ export async function buildReputationSignals(
   }
   // Strong: same unsupported/contradicted type in 2+ prior flagged
   else if (currentUnsupportedTypes.size > 0) {
-    const repeatedUnsupported = [...currentUnsupportedTypes].filter((t) => (unsupportedTypeCount[t] ?? 0) >= 2);
+    const repeatedUnsupported = [...currentUnsupportedTypes].filter((t) => (unsupportedTypeCount[t] ?? 0) >= 3);
     if (repeatedUnsupported.length > 0) {
       const priorFlaggedCount = Math.max(...repeatedUnsupported.map((t) => unsupportedTypeCount[t] ?? 0), 0);
       const priorScanCount = flagged.filter((s) => {

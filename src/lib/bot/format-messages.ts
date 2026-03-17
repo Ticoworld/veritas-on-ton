@@ -67,8 +67,8 @@ function formatAuthorityHistorySection(bot: BotScanResult): string {
 }
 
 /**
- * Picks 2–4 strongest, decision-relevant reasons only. No filler (e.g. "Visual evidence captured").
- * Surfaces claim-based and lineage findings when relevant.
+ * Picks 2–4 strongest, decision-relevant reasons only.
+ * Verdict-aware: legit tokens exclude drift noise; suspicious/high-risk rank claims above drift.
  */
 function strongestReasons(bot: BotScanResult): string[] {
   const reasons: string[] = [];
@@ -76,6 +76,30 @@ function strongestReasons(bot: BotScanResult): string[] {
     reasons.push(bot.summaryLine);
     return reasons;
   }
+
+  if (bot.displayVerdict === "Likely legitimate") {
+    // Only include genuine claim contradictions or domain/authority signals; skip drift noise.
+    const hasContradiction = (bot.claims ?? []).some((c) => c.verificationStatus === "contradicted");
+    if (hasContradiction && bot.claimSummary) reasons.push(bot.claimSummary);
+    const hasStrongDomainOrAuthority = !!(
+      bot.reputationSignals?.sameDomainInPriorFlagged ||
+      bot.reputationSignals?.authorityPlusPattern
+    );
+    if (hasStrongDomainOrAuthority && bot.reputationSignals?.strongestReputationFinding) {
+      reasons.push(bot.reputationSignals.strongestReputationFinding);
+    }
+    if (bot.onChainFindings.some((f) => f.includes("Mint authority is disabled"))) reasons.push("Mint and freeze disabled");
+    if (bot.visualFindings.some((f) => f.includes("did not detect") || f.includes("NO"))) reasons.push("No major visual deception detected");
+    const hasLiquidity = bot.marketFindings.some(
+      (f) => f.includes("Liquidity:") && (f.includes("K") || f.includes("M") || (f.includes("$") && !f.includes("$0.")))
+    );
+    if (hasLiquidity) reasons.push("Liquidity support present");
+    if (reasons.length === 0) reasons.push(bot.summaryLine);
+    return reasons.slice(0, 4);
+  }
+
+  // Suspicious / High risk: current-scan claim findings first, then strong reputation, then drift, then lineage
+  if (bot.claimSummary) reasons.push(bot.claimSummary);
   if (bot.reputationSignals?.strongestReputationFinding) {
     reasons.push(bot.reputationSignals.strongestReputationFinding);
   }
@@ -85,23 +109,12 @@ function strongestReasons(bot: BotScanResult): string[] {
   if (bot.lineage?.strongestLineageFinding && bot.lineage.lineageIdentityConfidence !== "low") {
     reasons.push(bot.lineage.strongestLineageFinding);
   }
-  if (bot.claimSummary) {
-    reasons.push(bot.claimSummary);
-  }
   if (bot.displayVerdict === "High risk" || bot.displayVerdict === "Suspicious") {
     if (bot.onChainFindings.some((f) => f.includes("Mint authority is enabled"))) reasons.push("Mint authority enabled");
     if (bot.onChainFindings.some((f) => f.includes("Freeze authority is enabled"))) reasons.push("Freeze authority enabled");
     if (bot.visualFindings.some((f) => f.toLowerCase().includes("reuse") || f.toLowerCase().includes("copy"))) reasons.push("Visual scam pattern detected");
     if (bot.onChainFindings.some((f) => f.includes("sold most of their allocation"))) reasons.push("Creator sold heavily");
     if (bot.onChainFindings.some((f) => f.includes("control") && f.includes("%"))) reasons.push("High holder concentration");
-  }
-  if (bot.displayVerdict === "Likely legitimate") {
-    if (bot.onChainFindings.some((f) => f.includes("Mint authority is disabled"))) reasons.push("Mint and freeze disabled");
-    if (bot.visualFindings.some((f) => f.includes("did not detect") || f.includes("NO"))) reasons.push("No major visual deception detected");
-    const hasLiquidity = bot.marketFindings.some(
-      (f) => f.includes("Liquidity:") && (f.includes("K") || f.includes("M") || (f.includes("$") && !f.includes("$0.")))
-    );
-    if (hasLiquidity) reasons.push("Liquidity support present");
   }
   if (reasons.length === 0) reasons.push(bot.summaryLine);
   return reasons.slice(0, 4);

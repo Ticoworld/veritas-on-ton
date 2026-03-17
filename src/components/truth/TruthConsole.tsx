@@ -502,15 +502,21 @@ function SkeletonSlowVision() {
     <div className="rounded-lg border overflow-hidden" style={borderStyle}>
       <div className="flex items-center justify-between px-4 py-2 border-b" style={borderStyle}>
         <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: "var(--tg-theme-hint-color)" }}>Veritas Verdict</span>
-        <span className="text-[10px] font-mono" style={{ color: "var(--tg-theme-hint-color)" }}>interrogating…</span>
+        <span className="text-[10px] font-mono" style={{ color: "var(--tg-theme-hint-color)" }}>interrogating...</span>
       </div>
       <div className="p-5 space-y-4">
         <div className="flex flex-col items-center justify-center py-6 space-y-3">
-          <div className="px-6 py-2.5 rounded border" style={borderStyle}>
-            <span className="font-mono text-sm tracking-widest" style={{ color: "var(--tg-theme-hint-color)" }}>[ INTERROGATING VISUALS ]</span>
+          <div className="px-4 py-2 rounded border" style={borderStyle}>
+            <span
+              className="font-mono text-[11px] tracking-[0.18em] sm:text-sm sm:tracking-widest"
+              style={{ color: "var(--tg-theme-hint-color)" }}
+            >
+              <span className="sm:hidden">[ VISUAL CHECK ]</span>
+              <span className="hidden sm:inline">[ INTERROGATING VISUALS ]</span>
+            </span>
           </div>
           <div className="flex items-center gap-2 text-xs" style={{ color: "var(--tg-theme-hint-color)" }}>
-            <span>Gemini Vision</span><span>•</span><span>AI Analysis</span>
+            <span>Gemini Vision</span><span>|</span><span>AI Analysis</span>
           </div>
         </div>
         <div className="rounded border p-4 min-h-[80px] space-y-2" style={{ backgroundColor: "var(--tg-theme-secondary-bg-color, #0A0A0B)", borderColor: "var(--tg-theme-hint-color, #27272A)" }}>
@@ -641,16 +647,56 @@ function hasMeaningfulDrift(drift: ScanResult["websiteDrift"]): boolean {
 }
 
 function hasMeaningfulReputation(rep: ScanResult["reputationSignals"]): boolean {
+  // Only strong signals show in the main card; weak motifs (single generic type, visual hash) stay in details.
   return !!(
     rep?.sameDomainInPriorFlagged ||
-    rep?.repeatedClaimMotif ||
-    rep?.repeatedVisualPattern ||
-    rep?.authorityPlusPattern
+    rep?.authorityPlusPattern ||
+    (rep?.repeatedClaimMotif && rep.repeatedClaimMotif.strength === "strong")
   );
 }
 
 function hasMeaningfulLineage(lineage: ScanResult["lineage"]): boolean {
   return !!lineage?.hasPriorHistory;
+}
+
+/**
+ * Verdict-aware headline finding selection.
+ * "Likely legitimate" tokens: only genuine claim contradictions or strong domain/authority signals may headline.
+ * "Suspicious" / "High risk": current-scan claim findings rank above drift and reputation noise.
+ */
+function selectHeadlineFinding(result: ScanResult): string | null {
+  const claims = result.claims ?? [];
+  const claimFinding = strongestClaimSummary(claims);
+  const hasContradiction = claims.some((c) => c.verificationStatus === "contradicted");
+  const hasDomainOrAuthority = !!(
+    result.reputationSignals?.sameDomainInPriorFlagged ||
+    result.reputationSignals?.authorityPlusPattern
+  );
+  // Only use strongestReputationFinding when it originates from a domain/authority signal
+  const strongRepFinding = hasDomainOrAuthority
+    ? (result.reputationSignals?.strongestReputationFinding ?? null)
+    : null;
+
+  if (result.verdict === "Safe") {
+    // "Likely legitimate": headline only from genuine claim contradictions or domain/authority risk signals.
+    // Drift and weak reputation must not headline a token that passed all scan checks.
+    if (hasContradiction && claimFinding) return claimFinding;
+    if (strongRepFinding) return strongRepFinding;
+    return null;
+  }
+
+  // Caution / Danger: current-scan claim assertions first, then strong reputation, then drift, then lineage
+  if (claimFinding) return claimFinding;
+  if (result.reputationSignals?.strongestReputationFinding) {
+    return result.reputationSignals.strongestReputationFinding;
+  }
+  if (result.websiteDrift?.materialChangesDetected && result.websiteDrift?.strongestFinding) {
+    return result.websiteDrift.strongestFinding;
+  }
+  if (result.lineage?.lineageIdentityConfidence !== "low" && result.lineage?.strongestLineageFinding) {
+    return result.lineage.strongestLineageFinding;
+  }
+  return null;
 }
 
 function SlowVision({
@@ -677,19 +723,15 @@ function SlowVision({
         </span>
       </div>
       <div className="p-4 space-y-3">
-        {(result.reputationSignals?.strongestReputationFinding || (result.websiteDrift?.materialChangesDetected && result.websiteDrift?.strongestFinding) || (result.lineage?.lineageIdentityConfidence !== "low" && result.lineage?.strongestLineageFinding) || strongestClaimSummary(result.claims ?? [])) && (
-          <div className="rounded border p-2.5" style={{ ...cardStyle, borderColor: "var(--tg-theme-hint-color, #27272A)" }}>
-            <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: textSecondary }}>Finding</span>
-            <p className="mt-0.5 text-xs font-mono leading-relaxed" style={{ color: textPrimary }}>
-              {result.reputationSignals?.strongestReputationFinding
-                ?? (result.websiteDrift?.materialChangesDetected && result.websiteDrift?.strongestFinding
-                  ? result.websiteDrift.strongestFinding
-                  : result.lineage?.lineageIdentityConfidence !== "low" && result.lineage?.strongestLineageFinding
-                    ? result.lineage.strongestLineageFinding
-                    : strongestClaimSummary(result.claims ?? []))}
-            </p>
-          </div>
-        )}
+        {(() => {
+          const headlineFinding = selectHeadlineFinding(result);
+          return headlineFinding ? (
+            <div className="rounded border p-2.5" style={{ ...cardStyle, borderColor: "var(--tg-theme-hint-color, #27272A)" }}>
+              <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: textSecondary }}>Finding</span>
+              <p className="mt-0.5 text-xs font-mono leading-relaxed" style={{ color: textPrimary }}>{headlineFinding}</p>
+            </div>
+          ) : null;
+        })()}
         {((result.evidence?.length > 0 || result.analysis?.length > 0) || whyBulletsForVerdict(result.verdict)) && (
           <div>
             <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: textSecondary }}>Why</span>
